@@ -7,8 +7,10 @@ def extract_values(data_set):
     for element in data_set.findall('.//element'):
         tag = element.get('tag')
         value = element.text.strip() if element.text else ""
-        if tag == '0010,0020':
-            values['PatientID'] = value
+        if tag == '0020,000D':
+            values['StudyInstanceUID'] = value
+        elif tag == '0020,000e':
+            values['SeriesInstanceUID'] = value
         elif tag == '0008,0020':
             values['StudyDate'] = value
         elif tag == '0008,1030':
