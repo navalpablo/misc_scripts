@@ -46,8 +46,6 @@ def process_folder(folder_path):
 def main():
     parser = argparse.ArgumentParser(description='Process XML files in a directory to extract medical imaging data.')
     parser.add_argument('path', type=str, help='The path to the directory containing XML files.')
-    parser.add_argument('--help', '-h', action='help', default=argparse.SUPPRESS,
-                        help='Show this help message and exit.')
 
     args = parser.parse_args()
     process_folder(args.path)
