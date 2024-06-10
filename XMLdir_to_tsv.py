@@ -5,9 +5,12 @@ import argparse
 def extract_values(data_set):
     values = {}
     for element in data_set.findall('.//element'):
-        tag = element.get('tag')
+        tag = element.get('tag').lower()  # Convert tag to lower case for comparison
         value = element.text.strip() if element.text else ""
-        if tag == '0020,000D':
+        print(f"Tag: {tag}, Value: {value}")  # Debug statement to see tags and values
+        if tag == '0010,0020':
+            values['PatientID'] = value
+        elif tag == '0020,000d':
             values['StudyInstanceUID'] = value
         elif tag == '0020,000e':
             values['SeriesInstanceUID'] = value
@@ -21,15 +24,13 @@ def extract_values(data_set):
             values['SeriesNumber'] = value
         elif tag == '0008,103e':
             values['SeriesDescription'] = value
-        elif tag == '0020,000e':
-            values['SeriesInstanceUID'] = value
     return values
 
 def process_folder(folder_path):
     output_filename = os.path.basename(folder_path) + "_list.tsv"
     output_path = os.path.join(folder_path, output_filename)
 
-    headers = ['PatientID', 'StudyDate', 'StudyDescription', 'AccessionNumber', 'SeriesNumber', 'SeriesDescription', 'SeriesInstanceUID']
+    headers = ['PatientID', 'StudyInstanceUID', 'StudyDate', 'StudyDescription', 'AccessionNumber', 'SeriesNumber', 'SeriesDescription', 'SeriesInstanceUID']
 
     with open(output_path, 'w') as tsv_file:
         tsv_file.write('\t'.join(headers) + '\n')
