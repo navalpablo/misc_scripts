@@ -1,0 +1,8 @@
+numpy
+scipy
+pillow
+rasterio
+pyproj
+shapely
+mapbox-vector-tile
+pysheds
