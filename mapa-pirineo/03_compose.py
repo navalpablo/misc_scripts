@@ -1,7 +1,8 @@
 """
 03 · Composición final para imprimir: paspartú, marco, gratícula, rotulación y cartela.
 
-Entrada : work/relief_f{F}.png, work/dem_lcc.tif
+Entrada : work/relief[_color]_f{F}.png, work/dem_lcc.tif
+Uso     : python3 03_compose.py [factor] [clasico|color]
 Salida  : output/pirineo_150cm.png / .tif  (F=1)   o  work/compose_f{F}.png (vista previa)
 Requiere haber ejecutado antes 01, 02 y 04.
 
@@ -12,15 +13,17 @@ import numpy as np
 import rasterio
 from rasterio.warp import transform as tx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from places import PEAKS, TOWNS, HOME, AREAS, RIVERS
+from places import PEAKS, TOWNS, AREAS, RIVERS
 import re
 import linework
 
 Image.MAX_IMAGE_PIXELS = None
 F = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+STYLE = sys.argv[2] if len(sys.argv) > 2 else "clasico"   # "clasico" | "color"
+SUFFIX = "" if STYLE == "clasico" else "_color"
 S = 1 / F                                     # escala de todo lo dibujado
 
-relief = Image.open(f"work/relief_f{F}.png").convert("RGB")
+relief = Image.open(f"work/relief{SUFFIX}_f{F}.png").convert("RGB")
 MW, MH = relief.size
 src = rasterio.open("work/dem_lcc.tif")
 dem = src.read(1, out_shape=(MH, MW))
@@ -198,7 +201,8 @@ symbols = []   # (tipo, x, y) se dibujan sobre el relieve con antialias via supe
 for txt, lon, lat, style in AREAS:
     x, y = ll2px(lon, lat); x += OX; y += OY
     if style == "country":
-        put_text(x, y, txt, font(SERIF, 150, 500), (110, 100, 90), "mm", tracking=120, halo_w=0)
+        put_text(x, y, txt, font(SERIF, 150, 500), (110, 100, 90) if STYLE == "clasico" else (84, 76, 68), "mm",
+                 tracking=120, halo_w=0 if STYLE == "clasico" else 7)
     elif style == "small_country":
         put_text(x, y, txt, font(SERIF, 78, 600), (110, 100, 90), "mm", tracking=48, halo_w=8)
     elif style == "valley":
@@ -271,12 +275,6 @@ for name, lon, lat, pos, rank in TOWNS:
         put_text(x + dx, y + dy, name.upper(), font(SANS, 48, 420), INK, anc, tracking=12)
     else:
         put_text(x + dx, y + dy, name, font(EB, 52, 480), INK, anc)
-
-# ---------------- Jaca
-JACA_C = (150, 52, 38)
-x, y = ll2px(HOME[1], HOME[2]); x += OX; y += OY
-symbols.append(("home", x, y))
-put_text(x - 40 * S, y - 46 * S, "JACA", font(SANS, 78, 600), JACA_C, "rb", tracking=22, halo_w=14)
 
 # ---------------- gratícula en el marco
 def edge_crossings():
@@ -354,10 +352,33 @@ for b_ in bars:
 
 LG_Y = SB_Y + 270 * S
 LG_W = 30 * km_px
-put_text(LX, LG_Y - 30 * S, "Altitud", fl, INK_SOFT, "lb", halo_w=0)
-for h in (0, 1000, 2000, 3000):
-    put_text(LX + LG_W * h / 3400, LG_Y + 70 * S, f"{h:,}".replace(",", ".") + (" m" if h == 3000 else ""),
-             fs, INK_SOFT, "mt", halo_w=0)
+swatches = []
+if STYLE == "clasico":
+    put_text(LX, LG_Y - 30 * S, "Altitud", fl, INK_SOFT, "lb", halo_w=0)
+    for h in (0, 1000, 2000, 3000):
+        put_text(LX + LG_W * h / 3400, LG_Y + 70 * S, f"{h:,}".replace(",", ".") + (" m" if h == 3000 else ""),
+                 fs, INK_SOFT, "mt", halo_w=0)
+else:
+    # muestras tomadas del propio mapa renderizado (mediana de píxeles llanos de cada cobertura)
+    from rasterio.enums import Resampling as _R
+    with rasterio.open("work/landcover_lcc.tif") as _s:
+        lcF = _s.read(1, out_shape=(MH, MW), resampling=_R.mode if F > 1 else _R.nearest)
+    rel = np.asarray(Image.open(f"work/relief{SUFFIX}_f{F}.png").convert("RGB"))
+    gy_, gx_ = np.gradient(dem, src.transform.a * SX)
+    slp = np.degrees(np.arctan(np.hypot(gx_, gy_))); del gy_, gx_
+    def med(mask):
+        return tuple(int(v) for v in np.median(rel[mask], axis=0))
+    items = [("Bosque", med((lcF == 10) & (slp < 8))),
+             ("Prado y pasto", med((lcF == 30) & (slp < 8))),
+             ("Cultivo", med((lcF == 40) & (slp < 4))),
+             ("Roca y pedregal", med((dem > 2300) & (dem < 2550) & (lcF == 60) & (slp < 30))),
+             ("Nieve", med((dem > 3000) & (slp < 30)))]
+    del rel, lcF, slp
+    put_text(LX, LG_Y - 30 * S, "Cobertura del suelo", fl, INK_SOFT, "lb", halo_w=0)
+    for k, (lab_, col_) in enumerate(items):
+        cx_, cy_ = LX + (k % 2) * LG_W / 2, LG_Y + (k // 2) * 78 * S
+        swatches.append((cx_, cy_, col_))
+        put_text(cx_ + 80 * S, cy_ + 22 * S, lab_, fs, INK_SOFT, "lm", halo_w=0)
 
 # leyenda de signos (segunda columna)
 KX = LX + LG_W + 230 * S
@@ -382,6 +403,15 @@ cred = [
     ("Relieve sombreado calculado a partir del modelo digital de elevaciones Copernicus DEM GLO-30", EB_I),
     ("© DLR e.V. 2010–2014 y © Airbus Defence and Space GmbH 2014–2018,", EB),
     ("proporcionado bajo el programa Copernicus por la Unión Europea y la ESA", EB),
+]
+if STYLE == "color":
+    cred += [
+        ("Cobertura del suelo: ESA WorldCover 10 m 2021 (© ESA, CC BY 4.0)", EB),
+        ("Tono del terreno: Sentinel-2 cloudless 2023, s2maps.eu, EOX IT Services GmbH", EB),
+        ("(datos Copernicus Sentinel modificados, CC BY-NC-SA 4.0)", EB),
+        ("Nieve: manto estacional modelado según cota, orientación y pendiente", EB),
+    ]
+cred += [
     ("Ríos, embalses, carreteras y fronteras: © colaboradores de OpenStreetMap (ODbL)", EB),
     ("Proyección cónica conforme de Lambert · paralelos 42°12′ y 43°12′ N", EB),
     ("Jaca · 2026", EB_I),
@@ -410,14 +440,17 @@ stops = [(0, (226, 229, 210)), (200, (224, 228, 204)), (500, (232, 230, 202)), (
          (1300, (238, 220, 184)), (1700, (230, 205, 174)), (2100, (218, 194, 172)), (2500, (212, 202, 196)),
          (2800, (228, 226, 226)), (3100, (246, 246, 246)), (3500, (255, 255, 255))]
 zz = np.array([s[0] for s in stops]); cc = np.array([s[1] for s in stops])
-n = int(LG_W)
-grad = np.stack([np.interp(np.linspace(0, 3400, n), zz, cc[:, i]) for i in range(3)], -1).astype(np.uint8)
-gh = int(36 * S)
-canvas.paste(Image.fromarray(np.repeat(grad[None], gh, 0)), (int(LX), int(LG_Y)))
-draw.rectangle((LX, LG_Y, LX + n, LG_Y + gh), outline=INK, width=max(1, int(2 * S)))
-for h in (0, 1000, 2000, 3000):
-    xx = LX + LG_W * h / 3400
-    draw.line([(xx, LG_Y + gh), (xx, LG_Y + gh + 14 * S)], fill=INK, width=max(1, int(2 * S)))
+if STYLE == "clasico":
+    n = int(LG_W)
+    grad = np.stack([np.interp(np.linspace(0, 3400, n), zz, cc[:, i]) for i in range(3)], -1).astype(np.uint8)
+    gh = int(36 * S)
+    canvas.paste(Image.fromarray(np.repeat(grad[None], gh, 0)), (int(LX), int(LG_Y)))
+    draw.rectangle((LX, LG_Y, LX + n, LG_Y + gh), outline=INK, width=max(1, int(2 * S)))
+    for h in (0, 1000, 2000, 3000):
+        xx = LX + LG_W * h / 3400
+        draw.line([(xx, LG_Y + gh), (xx, LG_Y + gh + 14 * S)], fill=INK, width=max(1, int(2 * S)))
+for cx_, cy_, col_ in swatches:
+    draw.rectangle((cx_, cy_, cx_ + 56 * S, cy_ + 44 * S), fill=col_, outline=INK, width=max(1, int(2 * S)))
 
 LW = lambda w: max(1, int(round(w * S)))
 for kind, x, y in key_lines:
@@ -439,7 +472,7 @@ for kind, x, y in key_lines:
 def ss_symbol(kind, x, y):
     """Símbolo dibujado a 4x y reducido (antialias)."""
     k = 4
-    size = int((84 if kind == "home" else 58) * S * k) + 8
+    size = int(58 * S * k) + 8
     im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     d = ImageDraw.Draw(im)
     c = size / 2
@@ -455,11 +488,6 @@ def ss_symbol(kind, x, y):
     elif kind == "town":
         a = 11 * S * k
         d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,), width=int(3 * S * k))
-    elif kind == "home":
-        a = 32 * S * k
-        d.ellipse((c - a, c - a, c + a, c + a), outline=JACA_C + (255,), width=int(6 * S * k))
-        b = a * 0.45
-        d.ellipse((c - b, c - b, c + b, c + b), fill=JACA_C + (255,))
     im = im.resize((size // k, size // k), Image.LANCZOS)
     canvas.paste(im, (int(x - im.width / 2), int(y - im.height / 2)), im)
 
@@ -472,10 +500,10 @@ for color, (im, _) in layers.items():
 os.makedirs("output", exist_ok=True)
 if F == 1:
     dpi = MW / (140 / 2.54)
-    canvas.save("output/pirineo_150cm.tif", dpi=(dpi, dpi), compression="tiff_lzw")
-    canvas.save("output/pirineo_150cm.png", dpi=(dpi, dpi))
-    canvas.resize((CW // 6, CH // 6), Image.LANCZOS).save("output/pirineo_preview.jpg", quality=90)
+    canvas.save(f"output/pirineo{SUFFIX}_150cm.tif", dpi=(dpi, dpi), compression="tiff_lzw")
+    canvas.save(f"output/pirineo{SUFFIX}_150cm.png", dpi=(dpi, dpi))
+    canvas.resize((CW // 4, CH // 4), Image.LANCZOS).save(f"output/pirineo{SUFFIX}_preview.jpg", quality=90)
     print(f"lámina {CW}x{CH} px · {CW / dpi * 2.54:.1f} x {CH / dpi * 2.54:.1f} cm a {dpi:.0f} ppp")
 else:
-    canvas.save(f"work/compose_f{F}.png")
+    canvas.save(f"work/compose{SUFFIX}_f{F}.png")
     print("vista previa", CW, CH)

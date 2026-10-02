@@ -20,6 +20,9 @@ from scipy import ndimage as nd
 from PIL import Image
 
 F = int(sys.argv[1]) if len(sys.argv) > 1 else 4
+STYLE = sys.argv[2] if len(sys.argv) > 2 else "clasico"     # "clasico" | "color"
+SUFFIX = "" if STYLE == "clasico" else "_color"
+TAG = sys.argv[3] if len(sys.argv) > 3 else ""             # para pruebas: base_color_f{F}{TAG}.png
 Z = 1.7            # exageración vertical del sombreado (no de la geometría)
 
 with rasterio.open("work/dem_lcc.tif") as src:
@@ -108,6 +111,10 @@ seac = np.array([0.80, 0.85, 0.86], np.float32)
 water_edge = water & ~nd.binary_erosion(water, iterations=max(1, 2 // F))
 coast = sea & ~nd.binary_erosion(sea, iterations=max(1, 3 // F))
 
+if STYLE == "color":
+    BASE = np.asarray(Image.open(f"work/base_color_f{F}{TAG}.png").convert("RGB"))
+    SHADE_K = float(__import__("os").environ.get("SHADE_K", 0.72))
+
 def render(r0, r1):
     """Renderiza las filas r0:r1 (con margen para los gradientes)."""
     m0, m1 = max(0, r0 - 2), min(H, r1 + 2)
@@ -119,13 +126,18 @@ def render(r0, r1):
     sl = slice(r0 - m0, r0 - m0 + (r1 - r0))
     hs, slope = hs[sl], slope[sl]
     d = dem[r0:r1]
-    rgb = np.empty(d.shape + (3,), np.float32)
-    for i in range(3):
-        rgb[..., i] = np.interp(d, zz, cc[:, i])
-    rock = (np.clip((slope - 32) / 20, 0, 1) * np.clip((d - 900) / 600, 0, 1))[..., None]
-    rgb = rgb * (1 - 0.35 * rock) + np.array([0.80, 0.78, 0.76], np.float32) * 0.35 * rock
+    if STYLE == "color":
+        rgb = BASE[r0:r1].astype(np.float32) / 255
+        K = SHADE_K
+    else:
+        rgb = np.empty(d.shape + (3,), np.float32)
+        for i in range(3):
+            rgb[..., i] = np.interp(d, zz, cc[:, i])
+        rock = (np.clip((slope - 32) / 20, 0, 1) * np.clip((d - 900) / 600, 0, 1))[..., None]
+        rgb = rgb * (1 - 0.35 * rock) + np.array([0.80, 0.78, 0.76], np.float32) * 0.35 * rock
+        K = 0.78
     shade = hs / np.sin(np.radians(45))
-    shade = np.clip(1.0 + 0.78 * (shade - 1), 0.30, 1.25) * (0.90 + 0.12 * occl[r0:r1])
+    shade = np.clip(1.0 + K * (shade - 1), 0.30, 1.25) * (0.90 + 0.12 * occl[r0:r1])
     light = shade[..., None]
     out = rgb * np.clip(light, 0.05, 1.0) ** gam
     out = out + (1 - out) * np.clip(light - 1, 0, None) * 1.6
@@ -150,5 +162,5 @@ STEP = 600
 for r in range(0, H, STEP):
     img[r:r + STEP] = render(r, min(H, r + STEP))
     print(f"  filas {r}-{min(H, r + STEP)}", flush=True)
-Image.fromarray(img).save(f"work/relief_f{F}.png")
+Image.fromarray(img).save(f"work/relief{SUFFIX}_f{F}{TAG}.png")
 print("ok", img.shape)

@@ -54,9 +54,8 @@ TOWNS = [
     ("Tremp",                 0.8947, 42.1667, "r", 2),
     ("Ripoll",                2.1903, 42.2014, "r", 2),
     ("Canfranc",             -0.5253, 42.7144, "l", 2),
+    ("Jaca",                 -0.5494, 42.5700, "t", 2),
 ]
-
-HOME = ("JACA", -0.5494, 42.5700)
 
 # rótulos de área: texto, lon, lat, estilo
 AREAS = [

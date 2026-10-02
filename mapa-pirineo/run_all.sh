@@ -1,10 +1,22 @@
 #!/usr/bin/env bash
-# Genera la lámina completa (≈ 5 min y ~4 GB de RAM).  Vista previa rápida: F=4 ./run_all.sh
+# Genera las dos láminas (≈ 10 min y ~4 GB de RAM).
+#   ./run_all.sh               -> output/pirineo_150cm.* (clásica) y output/pirineo_color_150cm.* (color)
+#   F=4 ./run_all.sh           -> vistas previas a 1/4 en work/compose*_f4.png
+#   STYLES=color ./run_all.sh  -> solo una de las dos
 set -euo pipefail
 cd "$(dirname "$0")"
 F=${F:-1}
+STYLES=${STYLES:-"clasico color"}
 ./00_download.sh
 python3 01_prepare_dem.py
-python3 02_render_relief.py "$F"
 python3 04_osm_hydro_roads.py
-python3 03_compose.py "$F"
+for st in $STYLES; do
+  if [ "$st" = "color" ]; then
+    ./05_download_color.sh
+    python3 06_landcover.py
+    python3 07_satellite.py
+    python3 08_color_base.py "$F"
+  fi
+  python3 02_render_relief.py "$F" "$st"
+  python3 03_compose.py "$F" "$st"
+done

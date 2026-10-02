@@ -4,3 +4,5 @@ fonts/
 work/
 output/
 __pycache__/
+landcover/
+s2/
