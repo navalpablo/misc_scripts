@@ -62,7 +62,7 @@ np.save(f"work/mask_sea_f{F}.npy", sea)
 def hillshade(z, az, alt):
     gy, gx = np.gradient(z * Z, pix)
     slope = np.arctan(np.hypot(gx, gy))
-    aspect = np.arctan2(-gx, gy)
+    aspect = np.arctan2(gy, -gx)          # gy = dz/dfila (hacia el sur), gx = dz/dcolumna (hacia el este)
     azr, altr = np.radians(360 - az + 90), np.radians(alt)
     return (np.sin(altr) * np.cos(slope) +
             np.cos(altr) * np.sin(slope) * np.cos(azr - aspect)).clip(0, 1).astype(np.float32)
