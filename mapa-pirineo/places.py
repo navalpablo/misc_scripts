@@ -166,6 +166,76 @@ POIS = [
     ("Saint-Michel-de-Cuxa",  2.4167, 42.5950, "l"),
     ("Prieuré de Serrabone",  2.5950, 42.6020, "r"),
     ("Abbaye de l'Escaladieu", 0.2569, 43.1100, "r"),
+    # monumentos junto a núcleos rotulados pero separados de su centro
+    ("Sanctuaires de Lourdes", -0.0565, 43.0976, "l"),
+    ("Cité de Carcassonne",   2.3638, 43.2064, "r"),
+    ("Saint-Lizier",          1.1375, 43.0017, "t"),
+    ("Santa Cruz de la Serós", -0.6743, 42.5227, "t"),
+]
+
+# Monumentos elegidos por relevancia en Wikidata (09_select_labels.py) y fijados aquí para que no
+# desaparezcan al ampliar la selección: nombre, lon, lat, posición, tanda (1 antes de los municipios
+# automáticos, 2 después de las cimas automáticas)
+POIS_WD = [
+    ("Château d'Abbadia", -1.7492, 43.3775, "r", 1),
+    ("Catedral de Calahorra", -1.9575, 42.2989, "r", 1),
+    ("Grotte du Mas-d'Azil", 1.3547, 43.0694, "r", 1),
+    ("Cathédrale de Lescar", -0.4333, 43.3328, "r", 1),
+    ("Cathédrale de Lombez", 0.9106, 43.4744, "r", 1),
+    ("Oppidum d'Ensérune", 3.1106, 43.3097, "r", 1),
+    ("Fort du Portalet", -0.5628, 42.8864, "r", 1),
+    ("Château de Montaner", -0.0125, 43.3492, "r", 2),
+    ("Fort de Bellegarde", 2.8592, 42.4586, "r", 2),
+    ("Iglesia de San Martín de Oliván", -0.3023, 42.5758, "r", 2),
+    ("Monastère de Prouilhe", 2.0586, 43.1944, "r", 2),
+    ("Abbaye de Saint-Hilaire", 2.3106, 43.0939, "r", 2),
+    ("Castillo de Lerés", -0.4121, 42.4226, "r", 2),
+    ("Château de Bellocq", -0.9142, 43.5175, "r", 2),
+    ("Cueva de Chaves", -0.1480, 42.2246, "r", 2),
+    ("Château de Lagarde", 1.9357, 43.0506, "r", 2),
+    ("Pont Séjourné", 2.2036, 42.5178, "r", 2),
+    ("Castillo de Chiriveta", 0.6886, 42.1008, "r", 2),
+    ("Abbaye de Villelongue", 2.1669, 43.3056, "r", 2),
+    ("Conjunto megalítico Eteneta I", -1.9639, 43.2000, "r", 2),
+    ("Cathédrale de Rieux", 1.2031, 43.2584, "r", 2),
+    ("Château d'Usson", 2.0875, 42.7356, "r", 2),
+    ("Château de Bidache", -1.1383, 43.4875, "r", 2),
+    ("Castillo de Peña", -1.2996, 42.4943, "r", 2),
+    ("Sant Serni de Tavèrnoles", 1.4581, 42.3828, "r", 2),
+    ("Château de Ruthie", -0.9341, 43.1498, "r", 2),
+    ("Sant Pere del Burgal", 1.1673, 42.5460, "r", 2),
+]
+
+# Puertos de montaña (signo «)(», nombre y altitud; collados de OpenStreetMap): nombre, altitud, lon, lat,
+# prioridad (1 siempre; 2 solo si cabe sin pisar nada, en orden de importancia)
+PASSES = [
+    ("Puerto de Monrepós",     1280, -0.394, 42.354, 1),
+    ("Somport",                1632, -0.525, 42.796, 1),
+    ("Portalet",               1794, -0.418, 42.806, 2),
+    ("Col du Tourmalet",       2115,  0.145, 42.908, 2),
+    ("Port d'Envalira",        2408,  1.719, 42.540, 2),
+    ("Port de la Bonaigua",    2076,  0.982, 42.664, 2),
+    ("Col d'Aubisque",         1709, -0.340, 42.977, 2),
+    ("Puerto de Ibañeta",      1057, -1.324, 43.020, 2),
+    ("Col de Puymorens",       1915,  1.811, 42.560, 2),
+    ("Collada de Toses",       1791,  1.991, 42.336, 2),
+    ("Col de la Pierre-Saint-Martin", 1765, -0.768, 42.969, 2),
+    ("Col d'Aspin",            1489,  0.327, 42.942, 2),
+    ("Col de Peyresourde",     1569,  0.463, 42.802, 2),
+    ("Puerto de Belate",        847, -1.615, 43.049, 2),
+    ("Col de Marie-Blanque",   1035, -0.508, 43.070, 2),
+    ("Port de Pailhères",      2001,  1.992, 42.734, 2),
+    ("Col de Port",            1249,  1.453, 42.899, 2),
+    ("Col de la Perche",       1579,  2.092, 42.496, 2),
+    ("Coll d'Ares",            1512,  2.456, 42.367, 2),
+    ("Col de Jau",             1506,  2.251, 42.688, 2),
+    ("Puerto de Oroel",        1080, -0.562, 42.523, 2),
+]
+
+# Salidas por el borde del mapa hacia lugares de fuera: rótulo (líneas), lon, lat de un punto de la
+# carretera dentro del mapa cerca del borde, referencia de la carretera (OSM)
+EXITS = [
+    (("a Villanueva de Gállego", "y Peñaflor de Gállego"), -0.6243, 42.0121, "A-23"),
 ]
 
 # Embalses y lagunas con nombre: rótulo, lon, lat (punto dentro o junto a la lámina de agua OSM)
@@ -229,6 +299,8 @@ VALLEYS = [
 # Parajes naturales (cursiva verde, sin símbolo, centrada sobre el lugar): rótulo, lon, lat
 # (coordenadas de Wikidata u OpenStreetMap/Nominatim)
 NATURAL = [
+    ("Aigüestortes",           0.9480, 42.5770),
+    ("Forau de la Tuta",      -0.9951, 42.5999),
     ("Cirque de Gavarnie",    -0.0103, 42.6957),
     ("Cañón de Añisclo",       0.0600, 42.5950),
     ("Garganta de Escuaín",    0.1335, 42.5980),

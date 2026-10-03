@@ -26,10 +26,10 @@ from rasterio.enums import Resampling
 from rasterio.warp import transform as tx
 from scipy import ndimage as nd
 import mapbox_vector_tile as mvt
-from places import TOWNS, POIS, PEAKS, VALLEYS, AREAS
+from places import TOWNS, POIS, POIS_WD, PEAKS, VALLEYS, AREAS
 
-D_TOWN, D_POI, D_VALLEY, D_PEAK = 12e3, 13e3, 15e3, 16e3      # metros
-MIN_POP, MIN_POI_SL, MIN_VALLEY_SL = 150, 6, 4
+D_TOWN, D_POI, D_VALLEY, D_PEAK = 12e3, 9e3, 15e3, 16e3      # metros
+MIN_POP, MIN_POI_SL, MIN_VALLEY_SL = 150, 5, 4
 
 src = rasterio.open("work/dem_lcc.tif")
 inv = ~src.transform
@@ -152,7 +152,7 @@ POI_SKIP = re.compile(r"estaci[óo]n|estaci[óo]|\bgare\b|museo|mus[ée]e|museu|
                       r"ayuntamiento|consistorial|h[ôo]tel de ville|mairie|escuela|[ée]cole|colegio|cementerio|"
                       r"cimeti[èe]re|monument aux morts|orgue|[óo]rgano|retablo|retable|\bcruz\b|\bcroix\b|\bcreu\b|"
                       r"calvaire|fuente|fontaine|mercado|march[ée]|lavoir|lavadero|observatori|horno|four|forn|"
-                      r"tren|train|canal|parque|parc|valle|vall\b|zona|camino|chemin|sender|ruta|russe|^h[ôo]tel ", re.I)
+                      r"tren|train|canal|parque|parc|valle|vall\b|zona|camino|chemin|sender|ruta|russe|^h[ôo]tel |forau|\bfoz\b|gorges|cirque", re.I)
 
 def poi_ok(p):
     labs = [p.get(k) for k in ("les", "lca", "lfr", "leu") if p.get(k)]
@@ -160,7 +160,8 @@ def poi_ok(p):
 
 seen_q = set(); pois_raw = []
 for p in wd_rows("wikidata/pois.json"):
-    if p["type"] in POI_TYPES:
+    labs = [p.get(k) for k in ("les", "lca", "lfr", "leu") if p.get(k)]
+    if p["type"] in POI_TYPES and not any(POI_SKIP.search(l) for l in labs):
         p["unesco"] = 0; seen_q.add(p["q"]); pois_raw.append(p)
 if os.path.exists("wikidata/heritage.json"):
     for x in json.load(open("wikidata/heritage.json"))["results"]["bindings"]:
@@ -175,9 +176,10 @@ if os.path.exists("wikidata/heritage.json"):
 for p in pois_raw:
     p["score"] = p["sl"] + 10 * p.get("unesco", 0)
 pois_raw = [p for p in pois_raw if p["score"] >= MIN_POI_SL and inside(p["lon"], p["lat"])]
-poi_seed = xy_list([(p[1], p[2]) for p in POIS])
-pois_raw = [p for p in pois_raw if far_from(all_town_xy, p["lon"], p["lat"], 2500)
-            and far_from(poi_seed, p["lon"], p["lat"], 6000)]
+poi_seed = xy_list([(p[1], p[2]) for p in POIS + POIS_WD])
+# fuera de los núcleos rotulados (los muy relevantes pueden quedar a 1,4 km de su centro)
+pois_raw = [p for p in pois_raw if far_from(all_town_xy, p["lon"], p["lat"], 1400 if p["score"] >= 11 else 2500)
+            and far_from(poi_seed, p["lon"], p["lat"], 4000)]
 pois = greedy(pois_raw, poi_seed, D_POI, key=lambda p: -p["score"])
 def short_poi(n):
     """Acorta nombres largos: «Cathédrale Notre-Dame-de-… de Lescar» -> «Cathédrale de Lescar»."""
@@ -188,9 +190,10 @@ def short_poi(n):
     n = re.sub(r"^(Église|Iglesia|Església) (Saint|Sainte|San|Santa|Sant)", r"\2", n)
     n = re.sub(r"\s*\(.*\)$", "", n)
     return n
+RENAME = {"Iglesia de El Salvador": "El Salvador de Agüero"}      # nombres genéricos de Wikidata
 for p in pois:
     p["name"] = local_label(p, nearest_region(p["lon"], p["lat"]))
-    if p["name"]: p["name"] = short_poi(p["name"])
+    if p["name"]: p["name"] = RENAME.get(short_poi(p["name"]), short_poi(p["name"]))
 pois = [p for p in pois if p["name"] and len(p["name"]) <= 34]
 print("monumentos añadidos:", len(pois), [(p["name"], p["score"]) for p in pois])
 

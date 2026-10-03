@@ -13,7 +13,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import transform as tx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS, POIS, NATURAL, PARKS
+from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS, POIS, POIS_WD, NATURAL, PARKS, PASSES, EXITS
 import pickle, math
 import re
 import linework
@@ -46,8 +46,11 @@ OX, OY = MARGIN, MARGIN
 # ---------------- hidrografía, carreteras y frontera (OpenStreetMap)
 sea_mask = np.load(f"work/mask_sea_f{F}.npy")
 # espacios naturales protegidos (contorno OSM, 04b_osm_parks.py), por debajo de ríos y carreteras
-PARK_GEO = pickle.load(open("work/parks.pkl", "rb")) if os.path.exists("work/parks.pkl") else {}
-linework.draw_parks(canvas, OX, OY, F, MW, MH, PARK_GEO, {p[1]: p[2] for p in PARKS}, sea_mask=sea_mask)
+# Desactivado: con los contornos y los nombres largos de los parques la lámina quedaba demasiado cargada.
+DRAW_PARKS = False
+PARK_GEO = pickle.load(open("work/parks.pkl", "rb")) if DRAW_PARKS and os.path.exists("work/parks.pkl") else {}
+if DRAW_PARKS:
+    linework.draw_parks(canvas, OX, OY, F, MW, MH, PARK_GEO, {p[1]: p[2] for p in PARKS}, sea_mask=sea_mask)
 river_geo = linework.draw_all(canvas, OX, OY, F, MW, MH, sea_mask=sea_mask)
 del sea_mask
 
@@ -298,6 +301,12 @@ for name, lon, lat, pos, *rest in POIS:
     small = bool(rest) and rest[0] == 2
     poi_pts.append((name, x + OX, y + OY, pos, small))
     symbols.append(("poi", x + OX, y + OY, 11 if small else 15))
+pass_pts = []
+for name, ele, lon, lat, prio in PASSES:
+    if prio != 1: continue
+    x, y = ll2px(lon, lat)
+    pass_pts.append((name, ele, x + OX, y + OY))
+    symbols.append(("pass", x + OX, y + OY, 16))
 for kind, x, y, rad in symbols:
     rr = (rad + 2) * S
     BOXES.append((x - rr, y - rr, x + rr, y + rr))
@@ -451,6 +460,13 @@ for name, x, y, pos, pop in sorted(town_pts, key=lambda t: -t[4]):
     ov = place_block(point_cands(x, y, pos, (muni_radius(pop) + 16) * S), [(name, fm, INK, 0)], halo_w=8 + 3 * t)
     if ov > 0: print("  aviso: solape en", name, int(ov))
 
+# puertos imprescindibles: nombre y altitud
+fpass, fpass_h = font(EB, 42, 500), font(EB_I, 38, 420)
+for name, ele, x, y in pass_pts:
+    ov = place_block(point_cands(x, y, "r", 30 * S),
+                     [(name, fpass, INK, 0), (f"{ele:,}".replace(",", "."), fpass_h, INK_SOFT, 0)], halo_w=8)
+    if ov > 0: print("  aviso: solape en", name, int(ov))
+
 # monumentos: rombo y nombre en cursiva
 fpoi = font(EB_I, 44, 470)
 fpoi_s = font(EB_I, 36, 470)
@@ -495,7 +511,7 @@ for label, lon, lat in NATURAL:
 
 import shapely
 fpark = {1: font(EB_I, 52, 520), 2: font(EB_I, 44, 480), 3: font(EB_I, 44, 470)}
-for label, pat, kind, lon, lat in PARKS:
+for label, pat, kind, lon, lat in (PARKS if DRAW_PARKS else []):
     g = PARK_GEO.get(pat)
     if g is None:
         print("  sin contorno para", label.replace("\n", " ")); continue
@@ -589,12 +605,22 @@ print("  ríos automáticos:", n_riv)
 
 # ---- monumentos y patrimonio más relevantes (antes que los municipios automáticos)
 n_m = 0
+POI_PLACED = []
 def auto_poi(p):
     x, y = ll2px(p["lon"], p["lat"]); x += OX; y += OY
-    return try_symbol_label("poi", x, y, 15, point_cands(x, y, "r", 30 * S), [(p["name"], fpoi, INK, 0)], 8)
-for p in AUTO.get("pois", []):
-    if p.get("score", p["sl"]) >= 10:
-        n_m += auto_poi(p)
+    ok = try_symbol_label("poi", x, y, 15, point_cands(x, y, "r", 30 * S), [(p["name"], fpoi, INK, 0)], 8)
+    if ok: POI_PLACED.append(p)
+    return ok
+def fixed_poi(name, lon, lat, pos):
+    """Monumento fijado en places.POIS_WD: entra sin pisar nada si puede; si no, se coloca igualmente."""
+    x, y = ll2px(lon, lat); x += OX; y += OY
+    if try_symbol_label("poi", x, y, 15, point_cands(x, y, pos, 30 * S), [(name, fpoi, INK, 0)], 8):
+        return
+    symbols.append(("poi", x, y, 15)); rr = 17 * S; BOXES.append((x - rr, y - rr, x + rr, y + rr))
+    ov = place_block(point_cands(x, y, pos, 30 * S), [(name, fpoi, INK, 0)], halo_w=8)
+    print("  aviso: monumento fijado con solape", name, int(ov))
+for name, lon, lat, pos, stage in POIS_WD:
+    if stage == 1: fixed_poi(name, lon, lat, pos)
 
 # ---- municipios (por relevancia)
 n_t = 0
@@ -648,11 +674,25 @@ for p in AUTO.get("peaks", []):
         n_p += 1
 print("  cimas automáticas:", n_p, "de", len(AUTO.get("peaks", [])))
 
-# ---- resto de monumentos
+# ---- monumentos fijados (tanda 2)
+for name, lon, lat, pos, stage in POIS_WD:
+    if stage == 2: fixed_poi(name, lon, lat, pos)
+
+# ---- puertos de montaña secundarios: solo si caben sin pisar nada
+n_pass = 0
+for name, ele, lon, lat, prio in PASSES:
+    if prio == 1: continue
+    x, y = ll2px(lon, lat); x += OX; y += OY
+    if try_symbol_label("pass", x, y, 16, point_cands(x, y, "r", 30 * S),
+                        [(name, fpass, INK, 0), (f"{ele:,}".replace(",", "."), fpass_h, INK_SOFT, 0)], 8):
+        n_pass += 1; print("  puerto:", name)
+print("  puertos opcionales:", n_pass, "de", sum(1 for p in PASSES if p[4] != 1))
+
+# ---- más patrimonio cultural por toda la lámina: solo donde quepa sin pisar nada
 for p in AUTO.get("pois", []):
-    if p.get("score", p["sl"]) < 10:
-        n_m += auto_poi(p)
-print("  monumentos automáticos:", n_m, "de", len(AUTO.get("pois", [])))
+    n_m += auto_poi(p)
+print("  monumentos automáticos nuevos:", n_m, "de", len(AUTO.get("pois", [])))
+_json.dump(POI_PLACED, open(f"work/pois_placed{SUFFIX}_f{F}.json", "w"), ensure_ascii=False, indent=0)
 
 # ---------------- gratícula en el marco
 def edge_crossings():
@@ -703,6 +743,19 @@ for side, p, val in edge_crossings():
     else:
         y = OY + p; grat.append(((OX + MW, y), (OX + MW + TL, y)))
         put_text(OX + MW + TL + 12 * S, y, fmt(val, "lat"), fg, INK_SOFT, "mm", halo_w=0, rotate=-90)
+
+# ---------------- salidas por el borde: flecha en el margen y destino (p. ej. A-23 hacia Zaragoza)
+exit_marks = []
+fex, fref = font(EB_I, 40, 440), font(SANS, 30, 400)
+for lines_, lon, lat, ref in EXITS:
+    x, _ = ll2px(lon, lat); x += OX
+    y0 = OY + MH + 46 * S                          # bajo el filete exterior del marco
+    exit_marks.append((x, y0))
+    yy = y0 + 104 * S
+    if ref:
+        put_text(x, yy, ref, fref, INK_SOFT, "mt", tracking=2, halo_w=0); yy += 50 * S
+    for t in lines_:
+        put_text(x, yy, t, fex, INK_SOFT, "mt", halo_w=0); yy += 50 * S
 
 # ---------------- cartela inferior
 BY = OY + MH + int(150 * S)
@@ -763,8 +816,9 @@ KX = LX + LG_W + 230 * S
 KY = SB_Y - 40 * S
 ROW = 92 * S
 key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"), ("poi", "Monumento · patrimonio cultural"),
-             ("natlabel", "Paraje natural"),
-             ("park1", "Parque nacional"), ("park2", "Parque natural o regional"), ("river", "Río"), ("border", "Frontera"),
+             ("natlabel", "Paraje natural"), ("pass", "Puerto de montaña · altitud"),
+             *((("park1", "Parque nacional"), ("park2", "Parque natural o regional")) if DRAW_PARKS else ()),
+             ("river", "Río"), ("border", "Frontera"),
              ("major", "Autopista · autovía"), ("primary", "Carretera principal"), ("secondary", "Carretera secundaria")]
 key_lines = []
 for k, (kind, label) in enumerate(key_items):
@@ -777,6 +831,8 @@ for k, (kind, label) in enumerate(key_items):
     elif kind == "muni":                       # tres puntos: ~500, ~10.000 y ~200.000 hab.
         for dx_, pp in ((12, 500), (42, 10000), (84, 200000)):
             symbols.append(("muni", x + dx_ * S, y, muni_radius(pp)))
+    elif kind == "pass":
+        symbols.append(("pass", x + 45 * S, y, 16))
     elif kind == "natlabel":
         put_text(x + 48 * S, y, "Abc", fnat, NAT_INK, "mm", tracking=6, halo_w=0)
     else:
@@ -797,7 +853,7 @@ if STYLE == "color":
         ("Nieve: manto estacional modelado según cota, orientación y pendiente", EB),
     ]
 cred += [
-    ("Ríos, embalses, carreteras, fronteras, espacios protegidos, municipios y monumentos: © colaboradores de OpenStreetMap (ODbL)", EB),
+    ("Ríos, embalses, carreteras, puertos, fronteras, municipios y monumentos: © colaboradores de OpenStreetMap (ODbL)", EB),
     ("Selección de municipios, monumentos, patrimonio y valles por relevancia: Wikidata (CC0)", EB),
     ("Proyección cónica conforme de Lambert · paralelos 42°12′ y 43°12′ N · la rosa marca el norte geográfico", EB),
     ("Jaca · 2026", EB_I),
@@ -819,6 +875,9 @@ draw.rectangle((FR[0] - int(26 * S), FR[1] - int(26 * S), FR[2] + int(26 * S), F
                outline=INK_SOFT, width=max(1, int(2 * S)))
 for a, b in grat:
     draw.line([a, b], fill=INK, width=max(1, int(3 * S)))
+for x, y0 in exit_marks:                       # flecha: trazo fino y punta llena hacia fuera del mapa
+    draw.line([(x, y0), (x, y0 + 62 * S)], fill=INK_SOFT, width=max(1, int(3 * S)))
+    draw.polygon([(x - 13 * S, y0 + 56 * S), (x + 13 * S, y0 + 56 * S), (x, y0 + 88 * S)], fill=INK_SOFT)
 for x0, y0, x1, y1, fill in bar_rects:
     draw.rectangle((x0, y0, x1, y1), fill=INK if fill else PAPER, outline=INK, width=max(1, int(2 * S)))
 # leyenda hipsométrica: muestras del propio relieve sin sombra (paleta del render)
@@ -883,6 +942,13 @@ def ss_symbol(kind, x, y, rad):
                   width=max(1, int(2.5 * S * k)))
         b = a * 0.38
         d.polygon([(c, c - b), (c + b, c), (c, c + b), (c - b, c)], fill=PAPER + (255,))
+    elif kind == "pass":                        # «)(»: dos arcos enfrentados, la carretera pasa por la cintura
+        a = rad * S * k; g = a * 0.30; r_ = a * 1.25; w_ = max(1, int(3.4 * S * k))
+        for sgn in (-1, 1):
+            cx_ = c + sgn * (g + r_)
+            ang0 = 180 - 38 if sgn > 0 else -38
+            d.arc((cx_ - r_, c - r_, cx_ + r_, c + r_), ang0, ang0 + 76, fill=PAPER + (255,), width=w_ + int(3 * S * k))
+            d.arc((cx_ - r_, c - r_, cx_ + r_, c + r_), ang0, ang0 + 76, fill=INK + (255,), width=w_)
     elif kind == "muni":
         a = rad * S * k
         d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,),
