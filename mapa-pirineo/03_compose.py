@@ -13,7 +13,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import transform as tx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from places import PEAKS, TOWNS, AREAS, RIVERS
+from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS
 import re
 import linework
 
@@ -81,11 +81,15 @@ def text_size(txt, f, tracking=0):
     w = sum(f.getlength(ch) for ch in txt) + tracking * S * (len(txt) - 1)
     b = f.getbbox("H"); return w, b[3] - b[1], (0, b[1], w, b[3])
 
-def put_text(x, y, txt, f, color, anchor="lm", tracking=0, halo_w=10, rotate=0):
+BOXES = []        # cajas ya ocupadas (rótulos y símbolos) en coordenadas de lámina
+
+def put_text(x, y, txt, f, color, anchor="lm", tracking=0, halo_w=10, rotate=0, reg=True):
     """Dibuja texto (con espaciado opcional) y su halo. x, y en coordenadas de lámina."""
     w, h, b = text_size(txt, f, tracking)
     ax = {"l": 0, "m": -w / 2, "r": -w}[anchor[0]]
     ay = {"t": -b[1], "m": -(b[1] + b[3]) / 2, "b": -b[3]}[anchor[1]]
+    if reg and not rotate:
+        BOXES.append((x + ax, y + ay + b[1], x + ax + w, y + ay + b[3]))
     hw = int(halo_w * S)
     if rotate:
         pad = hw * 3 + 4
@@ -191,6 +195,7 @@ def _river_label(c, s_mid, txt, f, color, gap, tracking, halo_w, span):
         ti = ti.rotate(-ang, center=o, resample=Image.BICUBIC)
         hi = hi.rotate(-ang, center=o, resample=Image.BICUBIC)
         X, Y = int(round(x - o[0])), int(round(y - o[1]))
+        BOXES.append((x - a_ / 2, y - cap * 1.05, x + a_ / 2, y + cap * 0.3))
         layer(color); layers[color][0].paste(ti, (X, Y), ti)
         if hw > 0: halo.paste(hi, (X, Y), hi)
     return True
@@ -240,41 +245,124 @@ for label, pat, lon, lat, rank in RIVERS:
                        gap=wj * S / 2 + 14 * S, tracking=8, halo_w=7):
         print("  río demasiado corto para el rótulo:", label)
 
-# ---------------- cimas (ajustadas al máximo real del DEM en ~1.2 km)
+# ---------------- colocación de rótulos puntuales sin solapes
+MAPBOX = (OX, OY, OX + MW, OY + MH)
+PAD = 6 * S
+
+def overlap(box):
+    x0, y0, x1, y1 = box[0] - PAD, box[1] - PAD, box[2] + PAD, box[3] + PAD
+    tot = 0.0
+    for b0, b1, b2, b3 in BOXES:
+        w = min(x1, b2) - max(x0, b0); h = min(y1, b3) - max(y0, b1)
+        if w > 0 and h > 0: tot += w * h
+    # fuera del marco del mapa: penalización fuerte
+    out = (max(0, MAPBOX[0] - box[0]) + max(0, box[2] - MAPBOX[2]) +
+           max(0, MAPBOX[1] - box[1]) + max(0, box[3] - MAPBOX[3]))
+    return tot + out * 1e4
+
+def line_metrics(f):
+    bb = f.getbbox("Hg"); return bb[1], bb[3]
+
+def place_block(cands, lines, halo_w=10):
+    """cands: [(x, y, anchor)] en orden de preferencia; lines: [(texto, fuente, color, tracking)].
+    Coloca el bloque de líneas en el primer candidato libre (o en el de menor solape)."""
+    ws = [text_size(t, f, tr)[0] for t, f, c, tr in lines]
+    mets = [line_metrics(f) for t, f, c, tr in lines]
+    hs = [m1 - m0 for m0, m1 in mets]
+    gap = -0.08 * max(hs)
+    BW = max(ws); BH = sum(hs) + gap * (len(lines) - 1)
+    best = None
+    for x, y, anc in cands:
+        bx = {"l": x, "m": x - BW / 2, "r": x - BW}[anc[0]]
+        by = {"t": y, "m": y - BH / 2, "b": y - BH}[anc[1]]
+        box = (bx, by, bx + BW, by + BH)
+        ov = overlap(box)
+        if best is None or ov < best[0]:
+            best = (ov, bx, by, anc, box)
+        if ov == 0:
+            break
+    ov, bx, by, anc, box = best
+    cy = by
+    for (t, f, c, tr), w, (m0, m1), hh in zip(lines, ws, mets, hs):
+        lx = {"l": bx, "m": bx + (BW - w) / 2, "r": bx + BW - w}[anc[0]]
+        _draw_run(layer(c), hd, lx - (f.getbbox(t)[0] if tr == 0 else 0), cy - m0, t, f, tr, int(halo_w * S))
+        cy += hh + gap
+    BOXES.append(box)
+    return ov
+
+ORDER = ["r", "l", "t", "b", "tr", "tl", "br", "bl"]
+def point_cands(x, y, pref, d):
+    out = []
+    for p in [pref] + [q for q in ORDER if q != pref]:
+        dx, dy, anc = offset(p, d)
+        out.append((x + dx, y + dy, anc))
+    return out
+
+# posiciones de todos los símbolos primero, para que ningún rótulo los tape
 R = max(3, int(45 / SX))
+peak_pts = []
 for name, h, lon, lat, pos in PEAKS:
     x, y = ll2px(lon, lat)
     c, r = int(round(x)), int(round(y))
     w = dem[r - R:r + R, c - R:c + R]
-    i, j = np.unravel_index(np.argmax(w), w.shape)
-    x, y = c - R + j + OX, r - R + i + OY
-    symbols.append(("peak", x, y))
-    big = h >= 3000
-    d = 50 * S
-    dx, dy, anc = offset(pos, d)
-    fn = font(EB, 62 if big else 54, 580 if big else 500)
-    fh = font(EB_I, 44, 420)
-    # nombre + altitud en dos líneas
-    nh = fn.getbbox("Hg")[3]
-    if anc[1] == "b":
-        put_text(x + dx, y + dy - fh.getbbox("8")[3] * 1.15, name, fn, INK, anc)
-        put_text(x + dx, y + dy, f"{h:,}".replace(",", "."), fh, INK_SOFT, anc)
-    elif anc[1] == "t":
-        put_text(x + dx, y + dy, name, fn, INK, anc)
-        put_text(x + dx, y + dy + nh * 1.02, f"{h:,}".replace(",", "."), fh, INK_SOFT, anc)
-    else:
-        put_text(x + dx, y + dy - nh * 0.30, name, fn, INK, anc)
-        put_text(x + dx, y + dy + nh * 0.42, f"{h:,}".replace(",", "."), fh, INK_SOFT, anc)
-
-# ---------------- poblaciones
+    i, j = np.unravel_index(np.argmax(w), w.shape)    # cima ajustada al máximo real del DEM (~1.2 km)
+    peak_pts.append((name, h, c - R + j + OX, r - R + i + OY, pos))
+town_pts = []
 for name, lon, lat, pos, rank in TOWNS:
-    x, y = ll2px(lon, lat); x += OX; y += OY
-    symbols.append(("city" if rank == 1 else "town", x, y))
-    dx, dy, anc = offset(pos, (42 if rank == 1 else 32) * S)
-    if rank == 1:
-        put_text(x + dx, y + dy, name.upper(), font(SANS, 48, 420), INK, anc, tracking=12)
-    else:
-        put_text(x + dx, y + dy, name, font(EB, 52, 480), INK, anc)
+    x, y = ll2px(lon, lat)
+    town_pts.append((name, x + OX, y + OY, pos, rank))
+SYM_R = {"peak": 20, "city": 18, "town": 13, "village": 10}
+for name, h, x, y, pos in peak_pts:
+    symbols.append(("peak", x, y))
+for name, x, y, pos, rank in town_pts:
+    symbols.append(({1: "city", 2: "town", 3: "village"}[rank], x, y))
+for kind, x, y in symbols:
+    rr = SYM_R[kind] * S
+    BOXES.append((x - rr, y - rr, x + rr, y + rr))
+
+# cimas (de mayor a menor altitud)
+fh = font(EB_I, 44, 420)
+for name, h, x, y, pos in sorted(peak_pts, key=lambda t: -t[1]):
+    big = h >= 3000
+    fn = font(EB, 62 if big else 54, 580 if big else 500)
+    place_block(point_cands(x, y, pos, 50 * S),
+                [(name, fn, INK, 0), (f"{h:,}".replace(",", "."), fh, INK_SOFT, 0)])
+
+# poblaciones por rango
+f1, f2, f3 = font(SANS, 48, 420), font(EB, 52, 480), font(EB, 44, 470)
+for rank in (1, 2, 3):
+    for name, x, y, pos, rk in town_pts:
+        if rk != rank: continue
+        if rank == 1:
+            place_block(point_cands(x, y, pos, 42 * S), [(name.upper(), f1, INK, 12)])
+        elif rank == 2:
+            place_block(point_cands(x, y, pos, 32 * S), [(name, f2, INK, 0)])
+        else:
+            ov = place_block(point_cands(x, y, pos, 26 * S), [(name, f3, INK, 0)], halo_w=8)
+            if ov > 0: print("  aviso: solape en", name, int(ov))
+
+# embalses y lagunas: rótulo junto a la lámina de agua real (OSM)
+from shapely.geometry import Point as _Pt
+WATER_LABEL = (44, 88, 116)
+fw = font(EB_I, 44, 460)
+for label, lon, lat in RESERVOIRS:
+    x, y = ll2px(lon, lat)
+    p = _Pt(x * SX, y * SX)                       # osm.pkl está en px de resolución completa
+    near = [g for g in linework.OSM["water"] if g.distance(p) < 111]
+    if not near:
+        print("  sin agua para", label); continue
+    disk = p.buffer(222)
+    g = max(near, key=lambda g: g.intersection(disk).area).intersection(disk)
+    x0, y0, x1, y1 = [v / SX for v in g.bounds]
+    x0 += OX; x1 += OX; y0 += OY; y1 += OY
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    gap = 14 * S
+    cands = [(x1 + gap, cy, "lm"), (x0 - gap, cy, "rm"), (cx, y0 - gap, "mb"), (cx, y1 + gap, "mt"),
+             (x1 + gap, y0, "lb"), (x0 - gap, y0, "rb"), (x1 + gap, y1, "lt"), (x0 - gap, y1, "rt")]
+    if (x1 - x0) > 2.2 * (y1 - y0):               # embalse alargado E-O: mejor encima o debajo
+        cands = cands[2:4] + cands[:2] + cands[4:]
+    ov = place_block(cands, [(label, fw, WATER_LABEL, 0)], halo_w=8)
+    if ov > 0: print("  aviso: solape en", label, int(ov))
 
 # ---------------- gratícula en el marco
 def edge_crossings():
@@ -384,14 +472,14 @@ else:
 KX = LX + LG_W + 230 * S
 KY = SB_Y - 40 * S
 ROW = 92 * S
-key_items = [("peak", "Cima · altitud en metros"), ("city", "Ciudad"), ("town", "Población"),
-             ("river", "Río"), ("major", "Autopista · autovía"), ("primary", "Carretera principal"),
-             ("border", "Frontera")]
+key_items = [("peak", "Cima · altitud en metros"), ("city", "Ciudad"), ("town", "Villa"),
+             ("village", "Pueblo"), ("river", "Río"), ("border", "Frontera"),
+             ("major", "Autopista · autovía"), ("primary", "Carretera principal"), ("secondary", "Carretera secundaria")]
 key_lines = []
 for k, (kind, label) in enumerate(key_items):
-    col, row = divmod(k, 4)
-    x = KX + col * 900 * S; y = KY + row * ROW + 30 * S
-    if kind in ("peak", "city", "town"):
+    col, row = divmod(k, 3)
+    x = KX + col * 860 * S; y = KY + row * ROW + 30 * S
+    if kind in ("peak", "city", "town", "village"):
         symbols.append((kind, x + 45 * S, y))
     else:
         key_lines.append((kind, x, y))
@@ -453,20 +541,23 @@ for cx_, cy_, col_ in swatches:
     draw.rectangle((cx_, cy_, cx_ + 56 * S, cy_ + 44 * S), fill=col_, outline=INK, width=max(1, int(2 * S)))
 
 LW = lambda w: max(1, int(round(w * S)))
+blend = lambda col, op: tuple(int(round(p * (1 - op) + c * op)) for p, c in zip(PAPER, col))
 for kind, x, y in key_lines:
-    x0, x1 = x, x + 90 * S
+    x0, x1 = x, x + 96 * S
     if kind == "river":
         pts = [(x0 + t_, y + 9 * S * np.sin(t_ / (90 * S) * 2 * np.pi)) for t_ in np.linspace(0, 90 * S, 30)]
         draw.line(pts, fill=linework.RIVER, width=LW(6), joint="curve")
     elif kind == "major":
-        draw.line([(x0, y), (x1, y)], fill=linework.ROAD_MAJOR, width=LW(4))
+        draw.line([(x0, y), (x1, y)], fill=blend(linework.ROAD_MAJOR, 0.80), width=LW(4.4))
     elif kind == "primary":
-        draw.line([(x0, y), (x1, y)], fill=linework.ROAD_PRIMARY, width=LW(3))
+        draw.line([(x0, y), (x1, y)], fill=blend(linework.ROAD_PRIMARY, 0.68), width=LW(3))
+    elif kind == "secondary":
+        draw.line([(x0, y), (x1, y)], fill=blend(linework.ROAD_SECONDARY, 0.40), width=LW(2))
     elif kind == "border":
-        draw.line([(x0, y), (x1, y)], fill=(222, 210, 214), width=LW(26))
+        draw.line([(x0, y), (x1, y)], fill=blend(linework.BORDER, 0.24), width=LW(34))
         xx = x0
-        for L_, on in [(38, 1), (14, 0), (6, 1), (14, 0), (38, 1)]:
-            if on: draw.line([(xx, y), (min(x1, xx + L_ * S), y)], fill=linework.BORDER, width=LW(5))
+        for L_, on in [(46, 1), (16, 0), (9, 1), (16, 0), (46, 1)]:
+            if on: draw.line([(xx, y), (min(x1, xx + L_ * S), y)], fill=linework.BORDER, width=LW(6.5))
             xx += L_ * S
 
 def ss_symbol(kind, x, y):
@@ -488,6 +579,9 @@ def ss_symbol(kind, x, y):
     elif kind == "town":
         a = 11 * S * k
         d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,), width=int(3 * S * k))
+    elif kind == "village":
+        a = 7.5 * S * k
+        d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,), width=int(2.5 * S * k))
     im = im.resize((size // k, size // k), Image.LANCZOS)
     canvas.paste(im, (int(x - im.width / 2), int(y - im.height / 2)), im)
 

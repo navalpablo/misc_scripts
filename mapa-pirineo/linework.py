@@ -10,9 +10,10 @@ from scipy import ndimage as nd
 RIVER = (78, 124, 152)
 LAKE_FILL = (168, 196, 208)
 LAKE_EDGE = (98, 138, 160)
-ROAD_MAJOR = (160, 82, 62)
-ROAD_PRIMARY = (140, 108, 88)
-BORDER = (112, 66, 104)
+ROAD_MAJOR = (166, 76, 54)
+ROAD_PRIMARY = (150, 98, 74)
+ROAD_SECONDARY = (150, 112, 92)
+BORDER = (104, 58, 98)
 
 OSM = pickle.load(open("work/osm.pkl", "rb"))
 ACC = np.load("work/acc_km2_q4.npy")
@@ -69,7 +70,9 @@ def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
             d.line(pts, fill=255, width=max(1, int(round(width * sc))), joint="curve")
 
     # ---------- carreteras (discretas, por debajo de todo)
-    for key, col, w, op in (("primary", ROAD_PRIMARY, 2.4, 0.42), ("major", ROAD_MAJOR, 3.4, 0.55)):
+    for key, col, w, op in (("secondary", ROAD_SECONDARY, 2.0, 0.40),
+                            ("primary", ROAD_PRIMARY, 3.0, 0.68),
+                            ("major", ROAD_MAJOR, 4.4, 0.80)):
         m = new_mask(); d = ImageDraw.Draw(m)
         for ln in OSM["roads"][key]:
             poly_line(d, np.asarray(ln.coords), w)
@@ -79,10 +82,10 @@ def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
     # ---------- frontera: cinta suave + línea de trazo y punto
     m = new_mask(); d = ImageDraw.Draw(m)
     for ln in OSM["border"]:
-        poly_line(d, np.asarray(ln.coords), 30)
-    composite(m, BORDER, 0.16, blur=max(1, 6 * S))
+        poly_line(d, np.asarray(ln.coords), 42)
+    composite(m, BORDER, 0.24, blur=max(1, 7 * S))
     m = new_mask(); d = ImageDraw.Draw(m)
-    pattern = [(38, True), (14, False), (6, True), (14, False)]   # trazo, hueco, punto, hueco
+    pattern = [(46, True), (16, False), (9, True), (16, False)]   # trazo, hueco, punto, hueco
     plen = sum(p[0] for p in pattern)
     for ln in OSM["border"]:
         c = densify(np.asarray(ln.coords), 2.0)
@@ -98,10 +101,10 @@ def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
             if o:
                 run.append(p)
             elif run:
-                if len(run) > 1: poly_line(d, np.array(run), 4.5)
+                if len(run) > 1: poly_line(d, np.array(run), 6.5)
                 run = []
-        if len(run) > 1: poly_line(d, np.array(run), 4.5)
-    composite(m, BORDER, 0.85)
+        if len(run) > 1: poly_line(d, np.array(run), 6.5)
+    composite(m, BORDER, 0.95)
     del m
 
     # ---------- lagos, embalses, ibones

@@ -21,7 +21,7 @@ Hay dos versiones con la misma cartografía y rotulación:
 | Tono regional del terreno (versión color) | Sentinel-2 cloudless 2023, s2maps.eu, EOX IT Services GmbH (datos Copernicus Sentinel modificados, **CC BY-NC-SA 4.0: solo uso no comercial**) |
 | Nieve (versión color) | Manto estacional modelado sobre el DEM: cota de nieve ~2.250 m en caras norte y ~2.650 m en caras sur, sin nieve en paredes de más de ~45°, más en canales |
 | Grosor de los ríos (crece aguas abajo) | Área de cuenca calculada sobre el mismo DEM (`pysheds`) |
-| Ríos, lagos, embalses, ibones, carreteras, frontera | © colaboradores de OpenStreetMap (ODbL), vía teselas OpenMapTiles de OpenFreeMap |
+| Ríos, lagos, embalses, ibones, carreteras (autopistas, principales y secundarias), frontera, posición de pueblos y nombres de embalses | © colaboradores de OpenStreetMap (ODbL), vía teselas OpenMapTiles de OpenFreeMap y Nominatim |
 | Cimas | Coordenadas públicas, recolocadas sobre el máximo real del DEM; altitudes oficiales |
 | Tipografías | Cormorant Garamond, EB Garamond, Josefin Sans (SIL OFL) |
 
@@ -45,7 +45,7 @@ F=4 ./run_all.sh             # vistas previas rápidas a 1/4 (work/compose*_f4.p
 | 6 | `02_render_relief.py [F] [clasico\|color]` | Sombreado multidireccional (luz del NO), oclusión de valles, sombras frías, perspectiva aérea, agua y mar |
 | 7 | `03_compose.py [F] [clasico\|color]` | Lámina final: ríos y carreteras (`linework.py`), rótulos, gratícula, cartela, leyenda y créditos |
 
-Toponimia y posiciones de rótulos en `places.py` (fácil de editar: añadir un pico, mover un nombre, etc.).
+Toponimia en `places.py`: cimas, ciudades, villas, pueblos (rango 3) y embalses. Los rótulos se colocan solos en la primera de ocho posiciones alrededor del punto que no pise otro rótulo o símbolo; la posición indicada en `places.py` es solo la preferida.
 En `08_color_base.py` se ajustan los colores por cobertura, el peso del satélite y la cota de nieve.
 
 ## Imprimir

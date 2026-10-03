@@ -47,7 +47,7 @@ def polys_of(geom):
     if t == "MultiPolygon": return geom["coordinates"]
     return []
 
-rivers, roads, border, water = {}, {"major": [], "primary": []}, [], []
+rivers, roads, border, water = {}, {"major": [], "primary": [], "secondary": []}, [], []
 for p in sorted(glob.glob("tiles/11_*.pbf")):
     z, x, y = map(int, re.findall(r"\d+", p.split("/")[-1]))
     d = mvt.decode(open(p, "rb").read())
@@ -62,7 +62,8 @@ for p in sorted(glob.glob("tiles/11_*.pbf")):
         pr = f["properties"]; cl = pr.get("class")
         if pr.get("brunnel") == "tunnel":
             continue
-        key = "major" if cl in ("motorway", "trunk") else "primary" if cl == "primary" else None
+        key = ("major" if cl in ("motorway", "trunk") else "primary" if cl == "primary"
+               else "secondary" if cl == "secondary" else None)
         if key:
             for ln in lines_of(f["geometry"]):
                 roads[key].append(LineString(tile_to_px(z, x, y, ln)))
