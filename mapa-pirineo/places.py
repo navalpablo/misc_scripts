@@ -20,7 +20,8 @@ PEAKS = [
     ("Pic du Midi de Bigorre", 2877, 0.1411, 42.9364, "t"),
     ("Mont Valier",        2838,  1.0858, 42.7975, "t"),
     ("Canigó",             2784,  2.4567, 42.5192, "t"),
-    ("Bisaurín",           2670, -0.6447, 42.7952, "l"),
+    ("Bisaurín",           2670, -0.6400, 42.7885, "l"),
+    ("Anayet",             2574, -0.4544, 42.7816, "r"),
     ("Pedraforca",         2506,  1.7031, 42.2394, "b"),
     ("Anie",               2504, -0.7225, 42.9489, "t"),
     ("Guara",              2077, -0.2286, 42.2869, "b"),
@@ -80,7 +81,6 @@ TOWNS = [
     ("Campo",                 0.3972, 42.4098, "r",    496),
     ("Castejón de Sos",       0.4917, 42.5129, "r",    834),
     ("Alquézar",              0.0244, 42.1720, "r",    325),
-    ("Riglos",               -0.7267, 42.3483, "r",    263),
     ("Isaba · Izaba",        -0.9232, 42.8612, "r",    385),
     ("Ochagavía · Otsagabia",-1.0902, 42.9064, "l",    493),
     ("Orreaga · Roncesvalles",-1.3202, 43.0092, "r",     25),
@@ -88,7 +88,6 @@ TOWNS = [
     ("Sort",                  1.1298, 42.4114, "r",   2287),
     ("Esterri d'Àneu",        1.1229, 42.6275, "r",    914),
     ("el Pont de Suert",      0.7402, 42.4080, "r",   2425),
-    ("Taüll",                 0.8487, 42.5186, "r",   1129),
     ("Espot",                 1.0885, 42.5763, "r",    377),
     ("la Pobla de Segur",     0.9673, 42.2474, "r",   3179),
     ("Bellver de Cerdanya",   1.7745, 42.3702, "b",   2289),
@@ -107,10 +106,23 @@ TOWNS = [
     ("Mauléon",              -0.8886, 43.2233, "r",   2954),
     ("Cadaqués",              3.2752, 42.2893, "l",   2906),
     ("Ayerbe",               -0.6892, 42.2764, "l",   1051),
+    # pueblos con conjunto histórico (población de Wikidata)
+    ("Sos del Rey Católico", -1.2157, 42.4973, "r",    582),
+    ("Besalú",                2.6986, 42.1989, "r",   2592),
+    ("Castellfollit de la Roca", 2.5508, 42.2214, "t",  966),
+    ("Sant Joan de les Abadesses", 2.2867, 42.2361, "r", 3393),
+    ("Villefranche-de-Conflent", 2.3678, 42.5872, "b",  215),
+    ("Mont-Louis",            2.1228, 42.5081, "r",    153),
+    ("Collioure",             3.0808, 42.5256, "r",   2756),
+    ("Elne",                  2.9711, 42.6003, "r",   9511),
+    ("Navarrenx",            -0.7594, 43.3217, "r",   1042),
 ]
 
-# Monumentos y lugares de interés: nombre, lon, lat, posición preferida (coordenadas de OpenStreetMap)
+# Monumentos y lugares de interés cultural: nombre, lon, lat, posición preferida[, tamaño 2 = pequeño]
+# (coordenadas de Wikidata u OpenStreetMap). Repartidos por todas las regiones del mapa.
 POIS = [
+    ("La Huerta",            -0.5382, 42.5708, "br"),          # punto familiar
+    ("Santa María de Iguácel", -0.4719, 42.6471, "r", 2),      # ermita de la Garcipollera
     ("San Juan de la Peña",  -0.6730, 42.5075, "b"),
     ("Castillo de Loarre",   -0.6127, 42.3254, "r"),
     ("Monasterio de Leyre",  -1.1709, 42.6363, "t"),
@@ -120,6 +132,40 @@ POIS = [
     ("Saint-Bertrand-de-Comminges", 0.5714, 43.0267, "r"),
     ("Montségur",             1.8325, 42.8757, "r"),
     ("Sant Pere de Rodes",    3.1663, 42.3233, "t"),
+    # Navarra, Gipuzkoa e Iparralde
+    ("Palacio Real de Olite", -1.6501, 42.4808, "r"),
+    ("Santa María de Eunate", -1.7617, 42.6722, "r"),
+    ("Santa María de Ujué",   -1.4995, 42.5062, "r"),
+    ("Monasterio de la Oliva", -1.4669, 42.3718, "r"),
+    ("San Miguel de Aralar",  -1.9667, 42.9471, "r"),
+    ("Cuevas de Zugarramurdi", -1.5411, 43.2691, "b"),
+    ("L'Hôpital-Saint-Blaise", -0.7697, 43.2513, "r"),
+    # Aragón
+    ("Monasterio de San Victorián", 0.2211, 42.4575, "r"),
+    ("Monasterio de Obarra",  0.5974, 42.3979, "r"),
+    ("Castillo de Montearagón", -0.3440, 42.1540, "r"),
+    # Catalunya y Andorra
+    ("Sant Climent de Taüll", 0.8483, 42.5172, "r"),
+    ("Santa Maria de Gerri",  1.0668, 42.3222, "r"),
+    ("Santuari de Meritxell", 1.5910, 42.5550, "r"),
+    ("Sant Quirze de Colera", 3.0589, 42.4163, "l"),
+    ("Empúries",              3.1210, 42.1350, "l"),
+    ("Castell del Montgrí",   3.1314, 42.0519, "l"),
+    # Francia
+    ("Grotte de Niaux",       1.5940, 42.8210, "r"),
+    ("Château de Peyrepertuse", 2.5550, 42.8710, "t"),
+    ("Château de Quéribus",   2.6220, 42.8370, "b"),
+    ("Château de Puilaurens", 2.2990, 42.8040, "r"),
+    ("Château de Puivert",    2.0550, 42.9210, "r"),
+    ("Rennes-le-Château",     2.2627, 42.9281, "r"),
+    ("Châteaux de Lastours",  2.3780, 43.3360, "r"),
+    ("Abbaye de Lagrasse",    2.6172, 43.0901, "r"),
+    ("Abbaye de Fontfroide",  2.8980, 43.1270, "r"),
+    ("Forteresse de Salses",  2.9180, 42.8400, "r"),
+    ("Saint-Martin-du-Canigou", 2.4010, 42.5280, "b"),
+    ("Saint-Michel-de-Cuxa",  2.4167, 42.5950, "l"),
+    ("Prieuré de Serrabone",  2.5950, 42.6020, "r"),
+    ("Abbaye de l'Escaladieu", 0.2569, 43.1100, "r"),
 ]
 
 # Embalses y lagunas con nombre: rótulo, lon, lat (punto dentro o junto a la lámina de agua OSM)
@@ -139,6 +185,9 @@ RESERVOIRS = [
     ("Lac de Montbel",         1.97,  42.97),
     ("Lac de Vinça",           2.52,  42.645),
     ("Étang de Leucate",       3.01,  42.86),
+    ("Ibón de Estanés",       -0.5907, 42.7997),
+    ("Estany de Sant Maurici", 1.0049, 42.5818),
+    ("Estany de Banyoles",     2.7553, 42.1253),
 ]
 
 # rótulos de área: texto, lon, lat, estilo
@@ -174,6 +223,59 @@ VALLEYS = [
     ("Vall de Boí",        r"Noguera de Tor",         0.810, 42.480, 2),
     ("Canal Roya",         [(-0.5071, 42.7734), (-0.4834, 42.7898), (-0.4623, 42.7971), (-0.4534, 42.7928),
                             (-0.447, 42.7823)], -0.480, 42.789, 2),
+    ("La Garcipollera",    r"^Rio Ijuez$",           -0.495, 42.628, 2),
+]
+
+# Parajes naturales (cursiva verde, sin símbolo, centrada sobre el lugar): rótulo, lon, lat
+# (coordenadas de Wikidata u OpenStreetMap/Nominatim)
+NATURAL = [
+    ("Cirque de Gavarnie",    -0.0103, 42.6957),
+    ("Cañón de Añisclo",       0.0600, 42.5950),
+    ("Garganta de Escuaín",    0.1335, 42.5980),
+    ("Aguas Tuertas",         -0.6234, 42.8220),
+    ("Mallos de Riglos",      -0.7242, 42.3514),
+    ("Salto de Roldán",       -0.3767, 42.2533),
+    ("Foz de Lumbier",        -1.3010, 42.6304),
+    ("Foz de Arbayún",        -1.2050, 42.6720),
+    ("Selva de Irati",        -1.0833, 43.0000),
+    ("Gorges de Kakuetta",    -0.8409, 42.9987),
+    ("Cirque de Lescun",      -0.6751, 42.9362),
+    ("Pont d'Espagne",        -0.1400, 42.8511),
+    ("Néouvielle",             0.1597, 42.8431),
+    ("Congost de Mont-rebei",  0.6815, 42.0789),
+    ("Congost de Collegats",   1.0376, 42.2834),
+    ("Volcà del Croscat",      2.5361, 42.1540),
+    ("Orgues d'Ille-sur-Têt",  2.6262, 42.6876),
+    ("Gorges de la Fou",       2.6028, 42.4589),
+]
+
+# Espacios protegidos con su contorno real de OpenStreetMap (04b_osm_parks.py):
+# rótulo (\n = salto de línea), patrón del nombre OSM, tipo (1 parque nacional, 2 parque natural,
+# 3 parque natural regional francés), lon, lat preferidos para el rótulo (se busca hueco dentro del espacio)
+PARKS = [
+    ("Parque Nacional de\nOrdesa y Monte Perdido", r"^Parque nacional de Ordesa", 1, 0.07, 42.55),
+    ("Parc Nacional d'Aigüestortes\ni Estany de Sant Maurici", r"^Parc Nacional d'Aigüestortes", 1, 0.93, 42.565),
+    ("Parc national\ndes Pyrénées", r"^Parc national des Pyrénées \(cœur\)", 1, -0.30, 42.86),
+    ("Parque Natural\nPosets-Maladeta", r"^Parque Natural Posets-Maladeta", 2, 0.50, 42.66),
+    ("Parque Natural de la Sierra\ny Cañones de Guara", r"Sierra y los Cañones de Guara", 2, -0.10, 42.26),
+    ("Parque Natural de los\nValles Occidentales", r"Valles Occidentales", 2, -0.78, 42.84),
+    ("Parque Natural de las\nBardenas Reales", r"Bardenas Reales", 2, -1.45, 42.19),
+    ("Parc Natural del\nCadí-Moixeró", r"Cadí-Moixeró", 2, 1.72, 42.29),
+    ("Parc Natural de\nl'Alt Pirineu", r"Alt Pirineu", 2, 1.25, 42.63),
+    ("Parc Natural de la Zona\nVolcànica de la Garrotxa", r"^Parc Natural de (la )?Zona Volcànica de la Garrotxa", 2, 2.50, 42.11),
+    ("Parc Natural del\nCap de Creus", r"Cap de Creus", 2, 3.24, 42.30),
+    ("Parc Natural dels Aiguamolls\nde l'Empordà", r"Aiguamolls de l'Empordà", 2, 3.07, 42.22),
+    ("Parc Natural del Montgrí, les\nIlles Medes i el Baix Ter", r"Montgrí, les Illes Medes", 2, 3.12, 42.08),
+    ("Parc Natural de les Capçaleres\ndel Ter i del Freser", r"Capçaleres del Ter", 2, 2.22, 42.40),
+    ("Paratge Natural\nde l'Albera", r"Interès Nacional del Massís de l'Albera", 2, 2.98, 42.46),
+    ("Vall del Madriu-\nPerafita-Claror", r"^Vall del Madriu", 2, 1.60, 42.48),
+    ("Aralar\nparke naturala", r"^Aralar parke naturala", 2, -2.05, 42.98),
+    ("Aiako Harria\nparke naturala", r"^Aiako Harri", 2, -1.83, 43.25),
+    ("Señorío de Bertiz", r"^Bertizko Jaurerria", 2, -1.62, 43.14),
+    ("Parc naturel régional\ndes Pyrénées ariégeoises", r"Pyrénées ariégeoises", 3, 1.25, 42.92),
+    ("Parc naturel régional\ndes Pyrénées catalanes", r"Pyrénées catalanes", 3, 2.20, 42.62),
+    ("Parc naturel régional\nCorbières-Fenouillèdes", r"Corbières-Fenouillèdes", 3, 2.60, 42.95),
+    ("Parc naturel régional de la\nNarbonnaise en Méditerranée", r"Narbonnaise en Méditerranée", 3, 2.95, 43.06),
 ]
 
 # Ríos: rótulo, patrón del nombre OSM (regex), lon, lat del punto donde centrar el rótulo, tamaño

@@ -13,7 +13,8 @@ import numpy as np
 import rasterio
 from rasterio.warp import transform as tx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS, POIS
+from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS, POIS, NATURAL, PARKS
+import pickle, math
 import re
 import linework
 
@@ -44,6 +45,9 @@ OX, OY = MARGIN, MARGIN
 
 # ---------------- hidrografía, carreteras y frontera (OpenStreetMap)
 sea_mask = np.load(f"work/mask_sea_f{F}.npy")
+# espacios naturales protegidos (contorno OSM, 04b_osm_parks.py), por debajo de ríos y carreteras
+PARK_GEO = pickle.load(open("work/parks.pkl", "rb")) if os.path.exists("work/parks.pkl") else {}
+linework.draw_parks(canvas, OX, OY, F, MW, MH, PARK_GEO, {p[1]: p[2] for p in PARKS}, sea_mask=sea_mask)
 river_geo = linework.draw_all(canvas, OX, OY, F, MW, MH, sea_mask=sea_mask)
 del sea_mask
 
@@ -289,10 +293,11 @@ for name, h, x, y, pos in peak_pts:
 for name, x, y, pos, pop in town_pts:
     symbols.append(("muni", x, y, muni_radius(pop)))
 poi_pts = []
-for name, lon, lat, pos in POIS:
+for name, lon, lat, pos, *rest in POIS:
     x, y = ll2px(lon, lat)
-    poi_pts.append((name, x + OX, y + OY, pos))
-    symbols.append(("poi", x + OX, y + OY, 15))
+    small = bool(rest) and rest[0] == 2
+    poi_pts.append((name, x + OX, y + OY, pos, small))
+    symbols.append(("poi", x + OX, y + OY, 11 if small else 15))
 for kind, x, y, rad in symbols:
     rr = (rad + 2) * S
     BOXES.append((x - rr, y - rr, x + rr, y + rr))
@@ -315,6 +320,46 @@ for txt, lon, lat, style in AREAS:
 mx, my = ll2px(3.30, 42.45)
 put_text(mx + OX, my + OY, "Mar Mediterráneo", font(EB_I, 80, 420), WATER_INK, "mm",
          tracking=14, halo_w=0, rotate=90)
+
+# ---------------- rosa de los vientos con el norte geográfico, en el golfo de Bizkaia
+# En la cónica de Lambert los meridianos convergen: el norte geográfico solo coincide con la vertical
+# en el meridiano central (0°43′ E). La rosa se orienta según el meridiano que pasa por ella.
+def north_angle(lon, lat):
+    x0, y0 = ll2px(lon, lat); x1, y1 = ll2px(lon, lat + 0.05)
+    return math.degrees(math.atan2(x1 - x0, -(y1 - y0)))      # + : el norte se inclina hacia la derecha
+
+def find_rose():
+    from scipy import ndimage as _nd
+    s4 = np.load("work/mask_sea_f4.npy")
+    h4, w4 = s4.shape
+    reg = s4[: h4 // 3, : w4 // 5]
+    pad = np.zeros((reg.shape[0] + 2, reg.shape[1] + 2), bool); pad[1:-1, 1:-1] = reg
+    d4 = _nd.distance_transform_edt(pad)[1:-1, 1:-1] * 4 / F       # holgura hasta tierra o marco (px de lámina)
+    for R_ in (230 * S, 205 * S, 180 * S, 160 * S):
+        best = None
+        for r4 in range(0, reg.shape[0], 4):
+            for c4 in range(0, reg.shape[1], 4):
+                cl = d4[r4, c4]
+                if cl < R_ + 70 * S: continue
+                cx, cy = c4 * 4 / F, r4 * 4 / F
+                ny = cy - R_ - 85 * S
+                if ny - 70 * S < 60 * S: continue
+                box = (cx - R_ + OX, ny - 60 * S + OY, cx + R_ + OX, cy + R_ + OY)
+                if overlap(box) > 0: continue
+                if best is None or cl > best[0]:
+                    best = (cl, cx + OX, cy + OY, R_, box)
+        if best: return best
+    return None
+ROSE = find_rose()
+if ROSE:
+    _, RX0, RY0, ROSE_R, rbox = ROSE
+    BOXES.append(rbox)
+    _x, _y = src.xy((RY0 - OY) * SX, (RX0 - OX) * SX)
+    _lon, _lat = tx(src.crs, "EPSG:4326", [_x], [_y])
+    ROSE_ANG = north_angle(_lon[0], _lat[0])
+    print(f"  rosa en {_lon[0]:.2f}, {_lat[0]:.2f}  radio {ROSE_R / S:.0f} px  giro {ROSE_ANG:+.2f}°")
+else:
+    print("  aviso: sin sitio para la rosa")
 
 # ---------------- valles largos y estrechos: rótulo a lo largo del río que los recorre
 def label_along_river(label, axis, lon, lat, fnt, color, tracking, gap, halo_w):
@@ -408,8 +453,10 @@ for name, x, y, pos, pop in sorted(town_pts, key=lambda t: -t[4]):
 
 # monumentos: rombo y nombre en cursiva
 fpoi = font(EB_I, 44, 470)
-for name, x, y, pos in poi_pts:
-    ov = place_block(point_cands(x, y, pos, 30 * S), [(name, fpoi, INK, 0)], halo_w=8)
+fpoi_s = font(EB_I, 36, 470)
+for name, x, y, pos, small in poi_pts:
+    ov = place_block(point_cands(x, y, pos, (24 if small else 30) * S), [(name, fpoi_s if small else fpoi, INK, 0)],
+                     halo_w=7 if small else 8)
     if ov > 0: print("  aviso: solape en", name, int(ov))
 
 # embalses y lagunas: rótulo junto a la lámina de agua real (OSM)
@@ -434,6 +481,50 @@ for label, lon, lat in RESERVOIRS:
         cands = cands[2:4] + cands[:2] + cands[4:]
     ov = place_block(cands, [(label, fw, WATER_LABEL, 0)], halo_w=8)
     if ov > 0: print("  aviso: solape en", label, int(ov))
+
+# ---------------- parajes naturales (cursiva verde) y nombres de espacios protegidos
+NAT_INK = (44, 94, 50)
+fnat = font(EB_I, 44, 500)
+for label, lon, lat in NATURAL:
+    x, y = ll2px(lon, lat); x += OX; y += OY
+    d = 36 * S
+    cands = [(x, y, "mm"), (x, y - d, "mb"), (x, y + d, "mt"), (x + d, y, "lm"), (x - d, y, "rm"),
+             (x, y - 2.2 * d, "mb"), (x, y + 2.2 * d, "mt")]
+    ov = place_block(cands, [(label, fnat, NAT_INK, 6)], halo_w=8)
+    if ov > 0: print("  aviso: solape en", label, int(ov))
+
+import shapely
+fpark = {1: font(EB_I, 52, 520), 2: font(EB_I, 44, 480), 3: font(EB_I, 44, 470)}
+for label, pat, kind, lon, lat in PARKS:
+    g = PARK_GEO.get(pat)
+    if g is None:
+        print("  sin contorno para", label.replace("\n", " ")); continue
+    lines = [(t, fpark[kind], NAT_INK, 10 if kind == 1 else 6) for t in label.split("\n")]
+    # caja del rótulo para comprobar que queda dentro del espacio
+    ws = [text_size(t, f_, tr)[0] for t, f_, c_, tr in lines]
+    hh = sum(line_metrics(f_)[1] - line_metrics(f_)[0] for t, f_, c_, tr in lines)
+    BW_, BH_ = max(ws) * F, hh * F                       # en px de resolución completa
+    px_, py_ = ll2px(lon, lat); px_, py_ = px_ * F, py_ * F
+    minx, miny, maxx, maxy = g.bounds
+    step = 50.0
+    gx, gy = np.meshgrid(np.arange(minx, maxx, step), np.arange(miny, maxy, step))
+    gx, gy = gx.ravel(), gy.ravel()
+    order = np.argsort(np.hypot(gx - px_, gy - py_))
+    gx, gy = gx[order], gy[order]
+    gg = g.buffer(60)
+    inside_all = np.ones(len(gx), bool)
+    for dx_, dy_ in ((0, 0), (-.5, -.5), (.5, -.5), (-.5, .5), (.5, .5), (-.5, 0), (.5, 0)):
+        inside_all &= shapely.contains_xy(gg, gx + dx_ * BW_, gy + dy_ * BH_)
+    placed = False
+    for strict_inside in (True, False):
+        idx = np.nonzero(inside_all)[0] if strict_inside else np.nonzero(shapely.contains_xy(g, gx, gy))[0]
+        for i in idx[:600]:
+            cx_, cy_ = gx[i] / F + OX, gy[i] / F + OY
+            if place_block([(cx_, cy_, "mm")], lines, halo_w=8, strict=True) is not None:
+                placed = True; break
+        if placed: break
+    if not placed:
+        print("  sin hueco para", label.replace("\n", " "))
 
 # ================= rótulos automáticos (09_select_labels.py): mismo criterio en todo el mapa =================
 # Se colocan después de todo lo elegido a mano y SOLO si caben sin pisar nada; si no, se descartan.
@@ -496,6 +587,15 @@ for amax, name, items in sorted(rcands, key=lambda t: -t[0]):
             if len(placed) >= (2 if seg[-1] > 4400 * S else 1): break
 print("  ríos automáticos:", n_riv)
 
+# ---- monumentos y patrimonio más relevantes (antes que los municipios automáticos)
+n_m = 0
+def auto_poi(p):
+    x, y = ll2px(p["lon"], p["lat"]); x += OX; y += OY
+    return try_symbol_label("poi", x, y, 15, point_cands(x, y, "r", 30 * S), [(p["name"], fpoi, INK, 0)], 8)
+for p in AUTO.get("pois", []):
+    if p.get("score", p["sl"]) >= 10:
+        n_m += auto_poi(p)
+
 # ---- municipios (por relevancia)
 n_t = 0
 for t in AUTO.get("towns", []):
@@ -548,12 +648,10 @@ for p in AUTO.get("peaks", []):
         n_p += 1
 print("  cimas automáticas:", n_p, "de", len(AUTO.get("peaks", [])))
 
-# ---- monumentos
-n_m = 0
+# ---- resto de monumentos
 for p in AUTO.get("pois", []):
-    x, y = ll2px(p["lon"], p["lat"]); x += OX; y += OY
-    if try_symbol_label("poi", x, y, 15, point_cands(x, y, "r", 30 * S), [(p["name"], fpoi, INK, 0)], 8):
-        n_m += 1
+    if p.get("score", p["sl"]) < 10:
+        n_m += auto_poi(p)
 print("  monumentos automáticos:", n_m, "de", len(AUTO.get("pois", [])))
 
 # ---------------- gratícula en el marco
@@ -664,12 +762,13 @@ else:
 KX = LX + LG_W + 230 * S
 KY = SB_Y - 40 * S
 ROW = 92 * S
-key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"), ("poi", "Monumento"),
-             ("river", "Río"), ("border", "Frontera"),
+key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"), ("poi", "Monumento · patrimonio cultural"),
+             ("natlabel", "Paraje natural"),
+             ("park1", "Parque nacional"), ("park2", "Parque natural o regional"), ("river", "Río"), ("border", "Frontera"),
              ("major", "Autopista · autovía"), ("primary", "Carretera principal"), ("secondary", "Carretera secundaria")]
 key_lines = []
 for k, (kind, label) in enumerate(key_items):
-    col, row = divmod(k, 3)
+    col, row = divmod(k, 4)
     x = KX + col * 860 * S; y = KY + row * ROW + 30 * S
     if kind == "peak":
         symbols.append(("peak", x + 45 * S, y, 18))
@@ -678,10 +777,11 @@ for k, (kind, label) in enumerate(key_items):
     elif kind == "muni":                       # tres puntos: ~500, ~10.000 y ~200.000 hab.
         for dx_, pp in ((12, 500), (42, 10000), (84, 200000)):
             symbols.append(("muni", x + dx_ * S, y, muni_radius(pp)))
+    elif kind == "natlabel":
+        put_text(x + 48 * S, y, "Abc", fnat, NAT_INK, "mm", tracking=6, halo_w=0)
     else:
         key_lines.append((kind, x, y))
     put_text(x + 120 * S, y, label, fs, INK_SOFT, "lm", halo_w=0)
-
 # derecha: créditos
 RX = OX + MW
 cred = [
@@ -697,9 +797,9 @@ if STYLE == "color":
         ("Nieve: manto estacional modelado según cota, orientación y pendiente", EB),
     ]
 cred += [
-    ("Ríos, embalses, carreteras, fronteras, municipios y monumentos: © colaboradores de OpenStreetMap (ODbL)", EB),
-    ("Selección de municipios, monumentos y valles por relevancia: Wikidata (CC0)", EB),
-    ("Proyección cónica conforme de Lambert · paralelos 42°12′ y 43°12′ N", EB),
+    ("Ríos, embalses, carreteras, fronteras, espacios protegidos, municipios y monumentos: © colaboradores de OpenStreetMap (ODbL)", EB),
+    ("Selección de municipios, monumentos, patrimonio y valles por relevancia: Wikidata (CC0)", EB),
+    ("Proyección cónica conforme de Lambert · paralelos 42°12′ y 43°12′ N · la rosa marca el norte geográfico", EB),
     ("Jaca · 2026", EB_I),
 ]
 for k, (t, fname) in enumerate(cred):
@@ -751,6 +851,14 @@ for kind, x, y in key_lines:
         draw.line([(x0, y), (x1, y)], fill=blend(linework.ROAD_PRIMARY, 0.68), width=LW(3))
     elif kind == "secondary":
         draw.line([(x0, y), (x1, y)], fill=blend(linework.ROAD_SECONDARY, 0.40), width=LW(2))
+    elif kind in ("park1", "park2"):
+        bw_, bop_, lw_, _ = linework.PARK_STYLE[1 if kind == "park1" else 2]
+        y0_, y1_ = y - 24 * S, y + 24 * S
+        nb_ = max(1, min(int(bw_ * 0.5 * S), int(20 * S)))
+        for i_ in range(nb_, 0, -1):                          # cinta que se difumina hacia dentro
+            op_ = bop_ * (1 - (i_ - 1) / nb_) ** 0.8
+            draw.rectangle((x0 + i_, y0_ + i_, x1 - i_, y1_ - i_), outline=blend(linework.NATURE_BAND, op_ * 0.6))
+        draw.rectangle((x0, y0_, x1, y1_), outline=blend(linework.NATURE, 0.85), width=LW(lw_))
     elif kind == "border":
         draw.line([(x0, y), (x1, y)], fill=blend(linework.BORDER, 0.24), width=LW(34))
         xx = x0
@@ -781,6 +889,62 @@ def ss_symbol(kind, x, y, rad):
                   width=max(1, int((2.5 + rad * 0.08) * S * k)))
     im = im.resize((size // k, size // k), Image.LANCZOS)
     canvas.paste(im, (int(x - im.width / 2), int(y - im.height / 2)), im)
+
+def draw_rose(cx, cy, R, ang):
+    """Rosa de ocho puntas al estilo de grabado, girada según el meridiano local; «N» sobre la punta norte."""
+    k = 3
+    pad = 150 * S
+    size = int(2 * (R + pad) * k)
+    im = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    d = ImageDraw.Draw(im)
+    c = size / 2
+    Rk = R * k
+    def P(r, a):                                # a: grados desde el norte, en sentido horario
+        t = math.radians(a + ang)
+        return (c + r * math.sin(t), c - r * math.cos(t))
+    ink, paper = INK + (255,), PAPER + (255,)
+    soft = INK_SOFT + (255,)
+    # halo de papel suave bajo la rosa
+    hal = Image.new("L", (size, size), 0)
+    ImageDraw.Draw(hal).ellipse((c - Rk * 0.86, c - Rk * 0.86, c + Rk * 0.86, c + Rk * 0.86), fill=140)
+    hal = hal.filter(ImageFilter.GaussianBlur(Rk * 0.08))
+    im = Image.new("RGBA", (size, size), PAPER + (0,))
+    im.putalpha(hal)
+    d = ImageDraw.Draw(im)
+    # anillos y graduación cada 10°
+    lw1, lw2 = max(1, int(2.6 * S * k)), max(1, int(1.6 * S * k))
+    for rr, w in ((0.80, lw1), (0.72, lw2)):
+        d.ellipse((c - Rk * rr, c - Rk * rr, c + Rk * rr, c + Rk * rr), outline=ink, width=w)
+    for a in range(0, 360, 10):
+        r0 = 0.72 if a % 90 else 0.66
+        d.line([P(Rk * r0, a), P(Rk * 0.80, a)], fill=ink if a % 30 == 0 else soft, width=lw2)
+    # puntas: dos mitades, tinta y papel
+    def point(a, L, w):
+        tip, left, right, o = P(Rk * L, a), P(Rk * w, a - 45), P(Rk * w, a + 45), (c, c)
+        d.polygon([o, tip, left], fill=paper, outline=ink, width=lw2)
+        d.polygon([o, tip, right], fill=ink, outline=ink, width=lw2)
+    for a in (45, 135, 225, 315):
+        point(a, 0.60, 0.11)
+    for a in (0, 90, 180, 270):
+        point(a, 1.0, 0.17)
+    rc = Rk * 0.05
+    d.ellipse((c - rc, c - rc, c + rc, c + rc), fill=paper, outline=ink, width=lw2)
+    # «N» girada con la rosa
+    fN = ImageFont.truetype(FD + SERIF, max(8, int(118 * S * k)))
+    try: fN.set_variation_by_axes([600])
+    except Exception: pass
+    tb = fN.getbbox("N")
+    tw, th = tb[2] - tb[0], tb[3] - tb[1]
+    ti = Image.new("RGBA", (int(tw * 1.8), int(th * 1.8)), (0, 0, 0, 0))
+    ImageDraw.Draw(ti).text((ti.width / 2 - tw / 2 - tb[0], ti.height / 2 - th / 2 - tb[1]), "N", font=fN, fill=ink)
+    ti = ti.rotate(-ang, resample=Image.BICUBIC, expand=True)
+    nx, ny = P(Rk + 26 * S * k + th / 2, 0)
+    im.alpha_composite(ti, (int(nx - ti.width / 2), int(ny - ti.height / 2)))
+    im = im.resize((size // k, size // k), Image.LANCZOS)
+    canvas.paste(im, (int(cx - im.width / 2), int(cy - im.height / 2)), im)
+
+if ROSE:
+    draw_rose(RX0, RY0, ROSE_R, ROSE_ANG)
 
 for kind, x, y, rad in symbols:
     ss_symbol(kind, x, y, rad)

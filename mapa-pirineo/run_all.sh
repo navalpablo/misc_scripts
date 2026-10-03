@@ -10,6 +10,7 @@ STYLES=${STYLES:-"clasico color"}
 ./00_download.sh
 python3 01_prepare_dem.py
 python3 04_osm_hydro_roads.py
+python3 04b_osm_parks.py             # contornos de parques nacionales y naturales
 [ -f work/mask_sea_f4.npy ] || python3 02_render_relief.py 4 clasico     # máscara de mar para 09
 ./05b_wikidata.sh
 python3 09_select_labels.py          # rótulos automáticos con el mismo criterio en todo el mapa

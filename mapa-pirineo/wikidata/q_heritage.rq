@@ -1,0 +1,19 @@
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+SELECT ?item ?lon ?lat (SAMPLE(?t) AS ?type) (MAX(?sl) AS ?sitelinks) (MAX(IF(?h = wd:Q9259, 1, 0)) AS ?unesco)
+       (SAMPLE(?es) AS ?les) (SAMPLE(?ca) AS ?lca) (SAMPLE(?fr) AS ?lfr) (SAMPLE(?eu) AS ?leu) WHERE {
+  ?item wdt:P1435 ?h .
+  ?item wdt:P625 ?coord .
+  BIND(geof:longitude(?coord) AS ?lon) BIND(geof:latitude(?coord) AS ?lat)
+  FILTER(?lon > -2.15 && ?lon < 3.50 && ?lat > 41.94 && ?lat < 43.62)
+  ?item wikibase:sitelinks ?sl .
+  OPTIONAL { ?item wdt:P31 ?t }
+  OPTIONAL { ?item rdfs:label ?es FILTER(LANG(?es)="es") }
+  OPTIONAL { ?item rdfs:label ?ca FILTER(LANG(?ca)="ca") }
+  OPTIONAL { ?item rdfs:label ?fr FILTER(LANG(?fr)="fr") }
+  OPTIONAL { ?item rdfs:label ?eu FILTER(LANG(?eu)="eu") }
+}
+GROUP BY ?item ?lon ?lat

@@ -1,0 +1,189 @@
+<title>Pirineos en relieve</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap">
+<style>
+/* Una sola pantalla: barra de lámina arriba, visor a sangre debajo. Paleta tomada del propio mapa:
+   papel, tinta y el azul de los ríos. */
+:root {
+  --paper: #f4f0e6;
+  --ink: #3a342e;
+  --ink-soft: #6b6157;
+  --river: #34607e;
+  --rule: #d9d1c2;
+  --stage: #ebe6da;
+  --chip: #fbf8f1;
+  --font-display: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
+  --font-body: "EB Garamond", "Iowan Old Style", Georgia, serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1c2023; --ink: #ece6da; --ink-soft: #a9a196; --river: #8fb7d2;
+    --rule: #343a3f; --stage: #121517; --chip: #262b2f; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1c2023; --ink: #ece6da; --ink-soft: #a9a196; --river: #8fb7d2;
+  --rule: #343a3f; --stage: #121517; --chip: #262b2f; color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px;
+  display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+}
+header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+  padding-block: 10px; padding-inline: 16px; border-bottom: 1px solid var(--rule);
+}
+.name { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; min-width: 0; margin-right: auto; }
+h1 {
+  margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 1.7rem;
+  letter-spacing: 0.32em; text-transform: uppercase; line-height: 1;
+}
+.sub { font-style: italic; color: var(--ink-soft); font-size: 0.98rem; }
+.controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; background: var(--chip); }
+.seg button {
+  font: inherit; font-size: 0.95rem; border: 0; background: transparent; color: var(--ink-soft);
+  padding: 4px 14px; border-radius: 999px; cursor: pointer;
+}
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+.tools { display: inline-flex; gap: 4px; }
+.tools button {
+  font: inherit; font-size: 0.95rem; min-width: 34px; height: 32px; padding: 0 10px;
+  border: 1px solid var(--rule); background: var(--chip); color: var(--ink); border-radius: 6px; cursor: pointer;
+}
+.tools button:hover, .seg button:hover { color: var(--river); }
+button:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
+.readout {
+  font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 0.92rem; white-space: nowrap;
+}
+.readout b { color: var(--ink); font-weight: 500; }
+main { position: relative; min-height: 0; background: var(--stage); }
+#osd { position: absolute; inset: 0; }
+.hint {
+  position: absolute; left: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--chip); color: var(--ink-soft); border: 1px solid var(--rule);
+  padding: 5px 12px; border-radius: 999px; font-size: 0.88rem; font-style: italic; pointer-events: none;
+  transition: opacity .6s;
+}
+.hint.gone { opacity: 0; }
+.tools button { white-space: nowrap; }
+@media (max-width: 620px) {
+  h1 { font-size: 1.35rem; letter-spacing: 0.24em; }
+  .sub, .readout .scale, #z-real, #z-full { display: none; }
+  header { gap: 8px 12px; }
+  .name { margin-right: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
+</style>
+
+<header>
+  <div class="name">
+    <h1>Pirineos</h1>
+    <span class="sub">Del golfo de Bizkaia al cabo de Creus · lámina de 150 × 70 cm</span>
+  </div>
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Versión del mapa">
+      <button id="v-color" type="button" aria-pressed="true">Color</button>
+      <button id="v-clasico" type="button" aria-pressed="false">Clásica</button>
+    </div>
+    <div class="tools">
+      <button id="z-out" type="button" aria-label="Alejar">−</button>
+      <button id="z-in" type="button" aria-label="Acercar">+</button>
+      <button id="z-real" type="button" title="Escala aproximada de la lámina impresa">Tamaño real</button>
+      <button id="z-home" type="button">Entera</button>
+      <button id="z-full" type="button">Pantalla completa</button>
+    </div>
+    <span class="readout" aria-live="polite"><b id="cm">150</b> cm de lámina a la vista<span class="scale"> · 1:<span id="den">320.000</span> en pantalla</span></span>
+  </div>
+</header>
+<main>
+  <div id="osd" aria-label="Mapa de relieve de los Pirineos, ampliable"></div>
+  <div class="hint" id="hint">Arrastra para moverte · rueda o pellizco para acercar</div>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/openseadragon.min.js"></script>
+<script>
+(() => {
+  const W = 17731, H = 8286;            // píxeles de la lámina (301 ppp)
+  const SHEET_CM = 149.6;               // ancho de la lámina impresa
+  const PRINT_DPI = 301, CSS_DPI = 96;  // tamaño real ≈ 96/301 px de pantalla por píxel de lámina
+  const MAP_SCALE = 320000;             // escala del mapa impreso
+  const src = name => ({ Image: { xmlns: "http://schemas.microsoft.com/deepzoom/2008", Url: name + "_files/",
+    Format: "jpg", Overlap: "0", TileSize: "2048", Size: { Width: String(W), Height: String(H) } } });
+
+  const viewer = OpenSeadragon({
+    id: "osd",
+    tileSources: [{ tileSource: src("color3"), opacity: 1 }, { tileSource: src("clasico3"), opacity: 0 }],
+    showNavigationControl: false,
+    showNavigator: true, navigatorPosition: "BOTTOM_RIGHT", navigatorSizeRatio: 0.16,
+    navigatorBackground: "transparent", navigatorBorderColor: "transparent",
+    navigatorDisplayRegionColor: "#34607e",
+    maxZoomPixelRatio: 2.5, minZoomImageRatio: 0.8, visibilityRatio: 0.6,
+    animationTime: 0.9, springStiffness: 8, blendTime: 0.25,
+    gestureSettingsMouse: { clickToZoom: false, dblClickToZoom: true },
+    gestureSettingsTouch: { pinchRotate: false },
+    preserveImageSizeOnResize: true
+  });
+
+  // ---- versión (Color / Clásica), con enlace directo #color o #clasico
+  const btnC = document.getElementById("v-color"), btnK = document.getElementById("v-clasico");
+  function show(which) {
+    const items = [viewer.world.getItemAt(0), viewer.world.getItemAt(1)];
+    if (!items[1]) return;
+    const k = which === "clasico";
+    items[1].setOpacity(k ? 1 : 0);
+    items[0].setOpacity(k ? 0 : 1);
+    btnC.setAttribute("aria-pressed", String(!k));
+    btnK.setAttribute("aria-pressed", String(k));
+    try { history.replaceState(null, "", "#" + which); } catch (e) {}
+  }
+  btnC.addEventListener("click", () => show("color"));
+  btnK.addEventListener("click", () => show("clasico"));
+  viewer.addHandler("open", () => {
+    const h = (location.hash || "").replace("#", "");
+    show(h === "clasico" ? "clasico" : "color");
+  });
+
+  // ---- zoom
+  const vp = () => viewer.viewport;
+  document.getElementById("z-in").addEventListener("click", () => { vp().zoomBy(1.6); vp().applyConstraints(); });
+  document.getElementById("z-out").addEventListener("click", () => { vp().zoomBy(1 / 1.6); vp().applyConstraints(); });
+  document.getElementById("z-home").addEventListener("click", () => vp().goHome());
+  document.getElementById("z-real").addEventListener("click", () => {
+    const item = viewer.world.getItemAt(0); if (!item) return;
+    const target = (CSS_DPI / PRINT_DPI) * (window.devicePixelRatio ? 1 : 1);
+    vp().zoomTo(item.imageToViewportZoom(target));
+  });
+  document.getElementById("z-full").addEventListener("click", () => {
+    try { viewer.setFullScreen(!viewer.isFullPage()); } catch (e) {}
+  });
+
+  // ---- lectura: cuántos cm de lámina caben en pantalla y escala equivalente
+  const fmt = new Intl.NumberFormat("es-ES", { maximumFractionDigits: 0 });
+  const cmEl = document.getElementById("cm"), denEl = document.getElementById("den");
+  function readout() {
+    const item = viewer.world.getItemAt(0); if (!item) return;
+    const b = vp().getBounds(true);
+    const r = item.viewportToImageRectangle(b);
+    const cm = Math.min(SHEET_CM, r.width / W * SHEET_CM);
+    cmEl.textContent = cm >= 10 ? fmt.format(cm) : cm.toFixed(1).replace(".", ",");
+    const imgZoom = item.viewportToImageZoom(vp().getZoom(true));       // px de pantalla por px de lámina
+    const screenScale = imgZoom * PRINT_DPI / CSS_DPI;                    // 1 = tamaño impreso
+    denEl.textContent = fmt.format(Math.round(MAP_SCALE / screenScale / 1000) * 1000);
+  }
+  viewer.addHandler("animation", readout);
+  viewer.addHandler("animation-finish", readout);
+  viewer.addHandler("open", () => setTimeout(readout, 50));
+
+  // ---- la pista se va al primer gesto
+  const hint = document.getElementById("hint");
+  const hide = () => hint.classList.add("gone");
+  viewer.addHandler("canvas-drag", hide);
+  viewer.addHandler("canvas-scroll", hide);
+  viewer.addHandler("canvas-pinch", hide);
+  setTimeout(hide, 9000);
+})();
+</script>

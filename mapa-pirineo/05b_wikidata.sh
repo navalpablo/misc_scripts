@@ -5,7 +5,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 EP=https://qlever.dev/api/wikidata
-for q in munis_qlever regions pois valleys; do
+for q in munis_qlever regions pois valleys heritage; do
   out=wikidata/${q%_qlever}.json
   curl -sf -L --max-time 280 -A "pirineo-map/1.0" -H "Accept: application/sparql-results+json" \
        --data-urlencode "query@wikidata/q_$q.rq" "$EP" -o "$out"

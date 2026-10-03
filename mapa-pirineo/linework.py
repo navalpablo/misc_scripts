@@ -48,6 +48,67 @@ def densify(coords, step):
     return np.array(out)
 
 
+NATURE = (58, 112, 62)          # contorno de espacios protegidos
+NATURE_BAND = (96, 156, 84)     # cinta interior
+# tipo: (ancho de la cinta interior, opacidad de la cinta, grosor de línea, trazo discontinuo)
+PARK_STYLE = {1: (40, 0.42, 3.4, None), 2: (26, 0.32, 2.6, None), 3: (20, 0.26, 2.4, (26, 14))}
+
+
+def draw_parks(canvas, OX, OY, F, MW, MH, parks, kinds, sea_mask=None):
+    """Espacios protegidos: cinta verde difuminada por dentro del contorno + línea fina.
+    parks: {clave: (Multi)Polygon en px de resolución completa}; kinds: {clave: 1|2|3}."""
+    S = 1 / F
+    K = 2
+    land = None
+    if sea_mask is not None:
+        land = Image.fromarray(((~sea_mask) * 255).astype(np.uint8)).resize((MW, MH))
+    for kind in (3, 2, 1):
+        keys = [k for k in parks if kinds.get(k) == kind]
+        if not keys:
+            continue
+        bw, bop, lw, dash = PARK_STYLE[kind]
+        fill = Image.new("L", (MW, MH), 0); edge = Image.new("L", (MW, MH), 0)
+        line = Image.new("L", (MW * K, MH * K), 0)
+        df, de, dl = ImageDraw.Draw(fill), ImageDraw.Draw(edge), ImageDraw.Draw(line)
+        for k in keys:
+            g = parks[k]
+            for poly in (g.geoms if hasattr(g, "geoms") else [g]):
+                rings = [np.asarray(poly.exterior.coords)] + [np.asarray(h.coords) for h in poly.interiors]
+                for i, ring in enumerate(rings):
+                    pts = [tuple(p) for p in ring * S]
+                    if len(pts) < 3:
+                        continue
+                    df.polygon(pts, fill=255 if i == 0 else 0)
+                    de.line(pts + [pts[0]], fill=255, width=max(1, int(round(2 * bw * S))), joint="curve")
+                    c = densify(ring, 2.0)
+                    if dash is None:
+                        dl.line([tuple(p) for p in c * S * K], fill=255, width=max(1, int(round(lw * S * K))),
+                                joint="curve")
+                    else:
+                        seg = np.r_[0, np.cumsum(np.hypot(*np.diff(c, axis=0).T))]
+                        on = (seg % sum(dash)) < dash[0]
+                        run = []
+                        for p, o in zip(c, on):
+                            if o:
+                                run.append(tuple(p * S * K))
+                            elif run:
+                                if len(run) > 1:
+                                    dl.line(run, fill=255, width=max(1, int(round(lw * S * K))))
+                                run = []
+                        if len(run) > 1:
+                            dl.line(run, fill=255, width=max(1, int(round(lw * S * K))))
+        # cinta: el contorno grueso difuminado, solo por dentro del espacio y sobre tierra
+        band = edge.filter(ImageFilter.GaussianBlur(max(1, bw * S * 0.45)))
+        band = Image.fromarray((np.asarray(band, np.uint16) * np.asarray(fill, np.uint16) // 255).astype(np.uint8))
+        lin = line.resize((MW, MH), Image.BOX)
+        if land is not None:
+            band = Image.fromarray((np.asarray(band, np.uint16) * np.asarray(land, np.uint16) // 255).astype(np.uint8))
+            lin = Image.fromarray((np.asarray(lin, np.uint16) * np.asarray(land, np.uint16) // 255).astype(np.uint8))
+        canvas.paste(Image.new("RGB", (MW, MH), NATURE_BAND), (OX, OY), band.point(lambda v: int(v * bop)))
+        canvas.paste(Image.new("RGB", (MW, MH), NATURE), (OX, OY), lin.point(lambda v: int(v * 0.85)))
+        del fill, edge, line, band, lin
+
+
 def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
     S = 1 / F
     K = 2                     # supermuestreo

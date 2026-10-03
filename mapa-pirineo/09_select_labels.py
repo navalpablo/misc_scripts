@@ -8,8 +8,9 @@ Fuentes:
 Criterios (iguales en España, Andorra y Francia):
   - Municipio: relevancia = log10(población) + 0.06·(nº de Wikipedias − línea base del país;
     los bots crean un artículo por municipio, así que solo cuenta el exceso).
-  - Monumento (castillo, monasterio, abadía, catedral, fortaleza, palacio, yacimiento):
-    nº de Wikipedias ≥ 8, fuera de los núcleos ya rotulados.
+  - Monumento o lugar de patrimonio cultural (castillo, monasterio, iglesia, cueva con arte,
+    yacimiento, puente…, con protección patrimonial en Wikidata): nº de Wikipedias + 10 si es
+    Patrimonio Mundial ≥ 6, fuera de los núcleos ya rotulados.
   - Valle: elemento «valle» de Wikidata con ≥ 4 Wikipedias.
   - Cima: cumbre con nombre que es el punto más alto del relieve en 8 km a la redonda.
 Selección voraz por relevancia con una distancia mínima entre elementos del mismo tipo,
@@ -18,7 +19,7 @@ mucho donde elegir entra lo más relevante; donde hay poco, lo más relevante de
 
 Salida: work/auto_labels.json
 """
-import json, glob, math, re
+import json, glob, math, os, re
 import numpy as np
 import rasterio
 from rasterio.enums import Resampling
@@ -27,8 +28,8 @@ from scipy import ndimage as nd
 import mapbox_vector_tile as mvt
 from places import TOWNS, POIS, PEAKS, VALLEYS, AREAS
 
-D_TOWN, D_POI, D_VALLEY, D_PEAK = 12e3, 20e3, 15e3, 16e3      # metros
-MIN_POP, MIN_POI_SL, MIN_VALLEY_SL = 150, 8, 4
+D_TOWN, D_POI, D_VALLEY, D_PEAK = 12e3, 13e3, 15e3, 16e3      # metros
+MIN_POP, MIN_POI_SL, MIN_VALLEY_SL = 150, 6, 4
 
 src = rasterio.open("work/dem_lcc.tif")
 inv = ~src.transform
@@ -135,26 +136,63 @@ def wd_rows(path):
                         lfr=g.get("lfr"), leu=g.get("leu"), type=g.get("type", "").split("/")[-1]))
     return out
 
-# ---------------------------------------------------------------- monumentos
+# ---------------------------------------------------------------- monumentos y patrimonio
+# Dos consultas de Wikidata: tipos de monumento (pois.json) y todo lo que tiene una protección
+# patrimonial (P1435: BIC, monument historique, BCIN, Patrimonio Mundial…; heritage.json).
+# Se queda lo que por su nombre es un monumento visitable (castillo, monasterio, iglesia, cueva,
+# yacimiento, puente…) y se ordena por nº de Wikipedias, con +10 si es Patrimonio Mundial.
 POI_TYPES = {"Q23413", "Q44613", "Q160742", "Q2977", "Q57821", "Q839954", "Q16560", "Q817056", "Q1785071"}
-pois_raw = [p for p in wd_rows("wikidata/pois.json") if p["type"] in POI_TYPES and p["sl"] >= MIN_POI_SL
-            and inside(p["lon"], p["lat"])]
+POI_WORDS = re.compile(
+    r"\b(castillo|castell|ch[aâ]teau|castro|monasterio|monestir|monast[eè]re|abad[ií]a|abbaye|abbatiale|abadia|"
+    r"catedral|cath[ée]drale|colegiata|col·legiata|coll[ée]giale|bas[ií]lica|basilique|iglesia|esgl[ée]sia|[ée]glise|"
+    r"ermita|chapelle|capilla|santuario|santuari|sanctuaire|cueva|cuevas|cova|grotte|grottes|gruta|fuerte|fort|"
+    r"forteresse|fortaleza|palacio|palau|palais|puente|pont|torre|tour|oppidum|ciudad|ciutat|yacimiento|jaciment|"
+    r"dolmen|priorat|prieur[ée]|priorato|claustro|clo[îi]tre|muralla|ruinas|ru[ïi]nes|villa|termas|thermes|cit[ée])\b", re.I)
+POI_SKIP = re.compile(r"estaci[óo]n|estaci[óo]|\bgare\b|museo|mus[ée]e|museu|teatro|th[ée][âa]tre|parlament|"
+                      r"ayuntamiento|consistorial|h[ôo]tel de ville|mairie|escuela|[ée]cole|colegio|cementerio|"
+                      r"cimeti[èe]re|monument aux morts|orgue|[óo]rgano|retablo|retable|\bcruz\b|\bcroix\b|\bcreu\b|"
+                      r"calvaire|fuente|fontaine|mercado|march[ée]|lavoir|lavadero|observatori|horno|four|forn|"
+                      r"tren|train|canal|parque|parc|valle|vall\b|zona|camino|chemin|sender|ruta|russe|^h[ôo]tel ", re.I)
+
+def poi_ok(p):
+    labs = [p.get(k) for k in ("les", "lca", "lfr", "leu") if p.get(k)]
+    return any(POI_WORDS.search(l) for l in labs) and not any(POI_SKIP.search(l) for l in labs)
+
+seen_q = set(); pois_raw = []
+for p in wd_rows("wikidata/pois.json"):
+    if p["type"] in POI_TYPES:
+        p["unesco"] = 0; seen_q.add(p["q"]); pois_raw.append(p)
+if os.path.exists("wikidata/heritage.json"):
+    for x in json.load(open("wikidata/heritage.json"))["results"]["bindings"]:
+        g = {k: v["value"] for k, v in x.items()}
+        q = g["item"].split("/")[-1]
+        if q in seen_q: continue
+        p = dict(q=q, lon=float(g["lon"]), lat=float(g["lat"]), sl=int(g.get("sitelinks", 0)),
+                 les=g.get("les"), lca=g.get("lca"), lfr=g.get("lfr"), leu=g.get("leu"),
+                 type=g.get("type", "").split("/")[-1], unesco=int(g.get("unesco", 0)))
+        if poi_ok(p):
+            seen_q.add(q); pois_raw.append(p)
+for p in pois_raw:
+    p["score"] = p["sl"] + 10 * p.get("unesco", 0)
+pois_raw = [p for p in pois_raw if p["score"] >= MIN_POI_SL and inside(p["lon"], p["lat"])]
 poi_seed = xy_list([(p[1], p[2]) for p in POIS])
 pois_raw = [p for p in pois_raw if far_from(all_town_xy, p["lon"], p["lat"], 2500)
-            and far_from(poi_seed, p["lon"], p["lat"], 5000)]
-pois = greedy(pois_raw, poi_seed, D_POI, key=lambda p: -p["sl"])
+            and far_from(poi_seed, p["lon"], p["lat"], 6000)]
+pois = greedy(pois_raw, poi_seed, D_POI, key=lambda p: -p["score"])
 def short_poi(n):
     """Acorta nombres largos: «Cathédrale Notre-Dame-de-… de Lescar» -> «Cathédrale de Lescar»."""
     m = re.match(r"^(Cathédrale|Catedral|Catedral de [^ ]+|Abbaye|Monastère)\b.* (de |d')([A-ZÀ-Ý][^ ]*(?: [^ ]+)?)$", n)
     if m and len(n) > 28:
         return f"{m.group(1).split(' ')[0]} {m.group(2)}{m.group(3)}"
     n = re.sub(r" et d'.*$", "", n)                       # «Grottes d'Isturitz et d'Oxocelhaya»
+    n = re.sub(r"^(Église|Iglesia|Església) (Saint|Sainte|San|Santa|Sant)", r"\2", n)
+    n = re.sub(r"\s*\(.*\)$", "", n)
     return n
 for p in pois:
     p["name"] = local_label(p, nearest_region(p["lon"], p["lat"]))
     if p["name"]: p["name"] = short_poi(p["name"])
-pois = [p for p in pois if p["name"]]
-print("monumentos añadidos:", len(pois), [p["name"] for p in pois])
+pois = [p for p in pois if p["name"] and len(p["name"]) <= 34]
+print("monumentos añadidos:", len(pois), [(p["name"], p["score"]) for p in pois])
 
 # ---------------------------------------------------------------- valles
 val_raw = [v for v in wd_rows("wikidata/valleys.json") if v["sl"] >= MIN_VALLEY_SL and inside(v["lon"], v["lat"])]
@@ -209,6 +247,6 @@ print("cimas añadidas:", len(peaks), [(p["name"], p["ele"]) for p in peaks])
 
 json.dump(dict(
     towns=[dict(name=t["name"], lon=t["lon"], lat=t["lat"], pop=int(t["pop"]), score=round(t["score"], 2)) for t in towns],
-    pois=[dict(name=p["name"], lon=p["lon"], lat=p["lat"], sl=p["sl"]) for p in pois],
+    pois=[dict(name=p["name"], lon=p["lon"], lat=p["lat"], sl=p["sl"], score=p["score"]) for p in pois],
     valleys=[dict(name=v["name"], lon=v["lon"], lat=v["lat"], sl=v["sl"]) for v in valleys],
     peaks=peaks), open("work/auto_labels.json", "w"), ensure_ascii=False, indent=1)
