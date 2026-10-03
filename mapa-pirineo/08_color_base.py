@@ -23,7 +23,8 @@ from skimage.color import rgb2lab, lab2rgb
 from PIL import Image
 
 F = int(sys.argv[1]) if len(sys.argv) > 1 else 4
-SAT = float(sys.argv[2]) if len(sys.argv) > 2 else 0.5   # 0 = solo paleta · 1 = solo satélite
+SAT = float(sys.argv[2]) if len(sys.argv) > 2 else 0.5
+SNOW_CREST_DROP = float(sys.argv[3]) if len(sys.argv) > 3 else 400.0   # m que baja la nieve en cumbres   # 0 = solo paleta · 1 = solo satélite
 
 def sstep(x, a, b):
     t = np.clip((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t)
@@ -52,7 +53,11 @@ def base_color(dem, lc, s2, pix):
     south = (-gy / (np.hypot(gx, gy) + 1e-6)).astype(np.float32)      # +1 cara sur, -1 cara norte
     del gx, gy
     tpi = (zs - nd.gaussian_filter(zs, 400 / pix)).astype(np.float32) # <0 canal, >0 cresta
-    del zs
+    # posición relativa en su entorno (~3 km): 0 fondo de valle, 1 cumbre o cordal
+    win = max(3, int(3000 / pix) | 1)
+    zmax = nd.maximum_filter(zs, win); zmin = nd.minimum_filter(zs, win)
+    rel = ((zs - zmin) / np.maximum(zmax - zmin, 50)).astype(np.float32)
+    del zs, zmax, zmin
     pal = np.empty(dem.shape + (3,), np.float32)
     pal[:] = C(204, 208, 152)
     for k, (lo, hi, z0, z1) in lowhigh.items():
@@ -77,8 +82,11 @@ def base_color(dem, lc, s2, pix):
     w = np.array([SAT * 0.45, SAT, SAT], np.float32)     # el satélite aporta sobre todo el tono
     lab = Lp * (1 - w) + sat * w; del Lp, sat
     # ---- nieve (manto de final de primavera, derivado del relieve)
-    zline = 2450 + 200 * south * sstep(slope, 3, 15)          # N ~2250 m · S ~2650 m
+    zline = 2450 + 200 * south * sstep(slope, 3, 15)          # manto general: N ~2250 m · S ~2650 m
     snow = sstep(dem - zline, -110, 180)
+    # en cumbres y cordales la nieve baja ~400 m más (N ~1850 m · S ~2250 m); fondos y laderas bajas, no
+    crest = sstep(rel, 0.45, 0.8)
+    snow = np.maximum(snow, sstep(dem - (zline - SNOW_CREST_DROP), -60, 200) * crest)
     snow *= 1 - 0.75 * sstep(slope, 38, 58)                   # paredes sin nieve
     snow = np.clip(snow + 0.35 * snow * np.tanh(-tpi / 40), 0, 1)  # canales con más nieve
     lab = lab * (1 - snow[..., None]) + snowc * snow[..., None]

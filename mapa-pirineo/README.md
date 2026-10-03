@@ -19,7 +19,7 @@ Hay dos versiones con la misma cartografía y rotulación:
 | Relieve sombreado, tintas hipsométricas | Copernicus DEM GLO-30 (30 m): © DLR e.V. 2010–2014, © Airbus Defence and Space GmbH 2014–2018, programa Copernicus (UE/ESA) |
 | Bosque, matorral, prado, cultivo, roca, urbano (versión color) | ESA WorldCover 10 m 2021 (© ESA, CC BY 4.0) |
 | Tono regional del terreno (versión color) | Sentinel-2 cloudless 2023, s2maps.eu, EOX IT Services GmbH (datos Copernicus Sentinel modificados, **CC BY-NC-SA 4.0: solo uso no comercial**) |
-| Nieve (versión color) | Manto estacional modelado sobre el DEM: cota de nieve ~2.250 m en caras norte y ~2.650 m en caras sur, sin nieve en paredes de más de ~45°, más en canales |
+| Nieve (versión color) | Manto estacional modelado sobre el DEM: cota de nieve ~2.250 m en caras norte y ~2.650 m en caras sur, que baja ~400 m más en cumbres y cordales (posición alta en su entorno de ~3 km) sin tocar fondos de valle; sin nieve en paredes de más de ~45°, más en canales |
 | Grosor de los ríos (crece aguas abajo) | Área de cuenca calculada sobre el mismo DEM (`pysheds`) |
 | Ríos, lagos, embalses, ibones, carreteras (autopistas, principales y secundarias), frontera, posición y población de municipios, nombres de embalses | © colaboradores de OpenStreetMap (ODbL), vía teselas OpenMapTiles de OpenFreeMap y Nominatim |
 | Cimas | Coordenadas públicas, recolocadas sobre el máximo real del DEM; altitudes oficiales |
