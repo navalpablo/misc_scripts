@@ -139,6 +139,13 @@ AREAS = [
     ("Golfo de Bizkaia",  -1.78, 43.50, "sea"),
 ]
 
+# Valles rotulados a lo largo de su río (como los nombres de río, pero en el estilo de valle):
+# rótulo, patrón del río OSM (regex), lon, lat del centro del rótulo
+VALLEYS = [
+    ("Valle del Aragón",   r"^Río Aragón$",          -0.532, 42.640),
+    ("Vallée d'Aspe",      r"^Le Gave d'Aspe$",      -0.585, 42.930),
+]
+
 # Ríos: rótulo, patrón del nombre OSM (regex), lon, lat del punto donde centrar el rótulo, tamaño
 RIVERS = [
     ("Aragón",             r"^Río Aragón$",          -0.80, 42.590, 1),

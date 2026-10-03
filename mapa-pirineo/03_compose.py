@@ -13,7 +13,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import transform as tx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS
+from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS
 import re
 import linework
 
@@ -218,6 +218,35 @@ for txt, lon, lat, style in AREAS:
 mx, my = ll2px(3.30, 42.45)
 put_text(mx + OX, my + OY, "Mar Mediterráneo", font(EB_I, 80, 420), WATER_INK, "mm",
          tracking=14, halo_w=0, rotate=90)
+
+# ---------------- valles largos y estrechos: rótulo a lo largo del río que los recorre
+def label_along_river(label, pat, lon, lat, fnt, color, tracking, gap, halo_w):
+    ax_, ay_ = ll2px(lon, lat)
+    L = sum(fnt.getlength(ch) + tracking * S for ch in label)
+    cands = []
+    for name, items in river_geo.items():
+        if not re.search(pat, name): continue
+        for c, w, a in items:
+            cc_ = c * S
+            seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
+            if seg[-1] < L * 1.1: continue
+            dd = np.hypot(cc_[:, 0] - ax_, cc_[:, 1] - ay_)
+            j = int(dd.argmin())
+            cands.append((dd[j], cc_, seg, j, w))
+    cands.sort(key=lambda t: t[0])
+    if not cands or cands[0][0] > 700 * S:
+        print("  sin río para", label); return False
+    _, cc_, seg, j, w = cands[0]
+    s_mid = float(np.clip(seg[j], 0.6 * L, seg[-1] - 0.6 * L))
+    wj = w[min(len(w) - 1, int(np.searchsorted(seg, s_mid)))]
+    ok = river_label(cc_ + np.array([OX, OY]), s_mid, label, fnt, color,
+                     gap=wj * S / 2 + gap * S, tracking=tracking, halo_w=halo_w)
+    if not ok: print("  no cabe el rótulo de", label)
+    return ok
+
+fv = font(EB_I, 58, 420)
+for label, pat, lon, lat in VALLEYS:
+    label_along_river(label, pat, lon, lat, fv, INK_SOFT, 8, 22, 8)
 
 # ---------------- nombres de ríos
 RIVER_INK = (52, 96, 126)
