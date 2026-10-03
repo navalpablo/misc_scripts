@@ -236,6 +236,7 @@ PASSES = [
 # carretera dentro del mapa cerca del borde, referencia de la carretera (OSM)
 EXITS = [
     (("a Villanueva de Gállego", "y Peñaflor de Gállego"), -0.6243, 42.0121, "A-23"),
+    (("a Sant Cugat del Vallès",), 0.0612, 42.0181, "A-22"),
 ]
 
 # Embalses y lagunas con nombre: rótulo, lon, lat (punto dentro o junto a la lámina de agua OSM)
