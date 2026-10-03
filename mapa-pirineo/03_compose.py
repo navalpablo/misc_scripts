@@ -307,17 +307,21 @@ for name, h, lon, lat, pos in PEAKS:
     w = dem[r - R:r + R, c - R:c + R]
     i, j = np.unravel_index(np.argmax(w), w.shape)    # cima ajustada al máximo real del DEM (~1.2 km)
     peak_pts.append((name, h, c - R + j + OX, r - R + i + OY, pos))
+def pop_t(pop):
+    """0 para municipios de ~250 hab., 1 para ~200.000 hab. (escala logarítmica)."""
+    return float(np.clip((np.log10(max(pop, 1)) - 2.4) / 2.9, 0, 1))
+def muni_radius(pop):
+    return 7.5 + 10.5 * pop_t(pop)            # px a resolución completa
 town_pts = []
-for name, lon, lat, pos, rank in TOWNS:
+for name, lon, lat, pos, pop in TOWNS:
     x, y = ll2px(lon, lat)
-    town_pts.append((name, x + OX, y + OY, pos, rank))
-SYM_R = {"peak": 20, "city": 18, "town": 13, "village": 10}
+    town_pts.append((name, x + OX, y + OY, pos, pop))
 for name, h, x, y, pos in peak_pts:
-    symbols.append(("peak", x, y))
-for name, x, y, pos, rank in town_pts:
-    symbols.append(({1: "city", 2: "town", 3: "village"}[rank], x, y))
-for kind, x, y in symbols:
-    rr = SYM_R[kind] * S
+    symbols.append(("peak", x, y, 18))
+for name, x, y, pos, pop in town_pts:
+    symbols.append(("muni", x, y, muni_radius(pop)))
+for kind, x, y, rad in symbols:
+    rr = (rad + 2) * S
     BOXES.append((x - rr, y - rr, x + rr, y + rr))
 
 # cimas (de mayor a menor altitud)
@@ -328,18 +332,12 @@ for name, h, x, y, pos in sorted(peak_pts, key=lambda t: -t[1]):
     place_block(point_cands(x, y, pos, 50 * S),
                 [(name, fn, INK, 0), (f"{h:,}".replace(",", "."), fh, INK_SOFT, 0)])
 
-# poblaciones por rango
-f1, f2, f3 = font(SANS, 48, 420), font(EB, 52, 480), font(EB, 44, 470)
-for rank in (1, 2, 3):
-    for name, x, y, pos, rk in town_pts:
-        if rk != rank: continue
-        if rank == 1:
-            place_block(point_cands(x, y, pos, 42 * S), [(name.upper(), f1, INK, 12)])
-        elif rank == 2:
-            place_block(point_cands(x, y, pos, 32 * S), [(name, f2, INK, 0)])
-        else:
-            ov = place_block(point_cands(x, y, pos, 26 * S), [(name, f3, INK, 0)], halo_w=8)
-            if ov > 0: print("  aviso: solape en", name, int(ov))
+# municipios: un único estilo; punto y nombre crecen con la población (los grandes se colocan antes)
+for name, x, y, pos, pop in sorted(town_pts, key=lambda t: -t[4]):
+    t = pop_t(pop)
+    fm = font(EB, 42 + 18 * t, int(460 + 120 * t))
+    ov = place_block(point_cands(x, y, pos, (muni_radius(pop) + 16) * S), [(name, fm, INK, 0)], halo_w=8 + 3 * t)
+    if ov > 0: print("  aviso: solape en", name, int(ov))
 
 # embalses y lagunas: rótulo junto a la lámina de agua real (OSM)
 from shapely.geometry import Point as _Pt
@@ -472,15 +470,18 @@ else:
 KX = LX + LG_W + 230 * S
 KY = SB_Y - 40 * S
 ROW = 92 * S
-key_items = [("peak", "Cima · altitud en metros"), ("city", "Ciudad"), ("town", "Villa"),
-             ("village", "Pueblo"), ("river", "Río"), ("border", "Frontera"),
+key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"),
+             ("river", "Río"), ("border", "Frontera"),
              ("major", "Autopista · autovía"), ("primary", "Carretera principal"), ("secondary", "Carretera secundaria")]
 key_lines = []
 for k, (kind, label) in enumerate(key_items):
     col, row = divmod(k, 3)
     x = KX + col * 860 * S; y = KY + row * ROW + 30 * S
-    if kind in ("peak", "city", "town", "village"):
-        symbols.append((kind, x + 45 * S, y))
+    if kind == "peak":
+        symbols.append(("peak", x + 45 * S, y, 18))
+    elif kind == "muni":                       # tres puntos: ~500, ~10.000 y ~200.000 hab.
+        for dx_, pp in ((12, 500), (42, 10000), (84, 200000)):
+            symbols.append(("muni", x + dx_ * S, y, muni_radius(pp)))
     else:
         key_lines.append((kind, x, y))
     put_text(x + 120 * S, y, label, fs, INK_SOFT, "lm", halo_w=0)
@@ -500,7 +501,7 @@ if STYLE == "color":
         ("Nieve: manto estacional modelado según cota, orientación y pendiente", EB),
     ]
 cred += [
-    ("Ríos, embalses, carreteras y fronteras: © colaboradores de OpenStreetMap (ODbL)", EB),
+    ("Ríos, embalses, carreteras, fronteras y población de municipios: © colaboradores de OpenStreetMap (ODbL)", EB),
     ("Proyección cónica conforme de Lambert · paralelos 42°12′ y 43°12′ N", EB),
     ("Jaca · 2026", EB_I),
 ]
@@ -560,7 +561,7 @@ for kind, x, y in key_lines:
             if on: draw.line([(xx, y), (min(x1, xx + L_ * S), y)], fill=linework.BORDER, width=LW(6.5))
             xx += L_ * S
 
-def ss_symbol(kind, x, y):
+def ss_symbol(kind, x, y, rad):
     """Símbolo dibujado a 4x y reducido (antialias)."""
     k = 4
     size = int(58 * S * k) + 8
@@ -571,22 +572,15 @@ def ss_symbol(kind, x, y):
         a = 18 * S * k
         pts = [(c, c - a * 1.05), (c - a, c + a * 0.7), (c + a, c + a * 0.7)]
         d.polygon(pts, fill=INK + (255,), outline=PAPER + (255,), width=int(3 * S * k))
-    elif kind == "city":
-        a = 16 * S * k
-        d.ellipse((c - a, c - a, c + a, c + a), fill=PAPER + (255,), outline=INK + (255,), width=int(5 * S * k))
-        b = a * 0.42
-        d.ellipse((c - b, c - b, c + b, c + b), fill=INK + (255,))
-    elif kind == "town":
-        a = 11 * S * k
-        d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,), width=int(3 * S * k))
-    elif kind == "village":
-        a = 7.5 * S * k
-        d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,), width=int(2.5 * S * k))
+    elif kind == "muni":
+        a = rad * S * k
+        d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,),
+                  width=max(1, int((2.5 + rad * 0.08) * S * k)))
     im = im.resize((size // k, size // k), Image.LANCZOS)
     canvas.paste(im, (int(x - im.width / 2), int(y - im.height / 2)), im)
 
-for kind, x, y in symbols:
-    ss_symbol(kind, x, y)
+for kind, x, y, rad in symbols:
+    ss_symbol(kind, x, y, rad)
 
 for color, (im, _) in layers.items():
     canvas.paste(Image.new("RGB", (CW, CH), color), (0, 0), im)
