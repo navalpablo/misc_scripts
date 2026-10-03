@@ -13,7 +13,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import transform as tx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS
+from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS, POIS
 import re
 import linework
 
@@ -220,33 +220,50 @@ put_text(mx + OX, my + OY, "Mar Mediterráneo", font(EB_I, 80, 420), WATER_INK, 
          tracking=14, halo_w=0, rotate=90)
 
 # ---------------- valles largos y estrechos: rótulo a lo largo del río que los recorre
-def label_along_river(label, pat, lon, lat, fnt, color, tracking, gap, halo_w):
+def label_along_river(label, axis, lon, lat, fnt, color, tracking, gap, halo_w):
+    """Rótulo curvo a lo largo de un río OSM (regex) o de un eje de valle dado como [(lon, lat), ...]."""
     ax_, ay_ = ll2px(lon, lat)
     L = sum(fnt.getlength(ch) + tracking * S for ch in label)
     cands = []
-    for name, items in river_geo.items():
-        if not re.search(pat, name): continue
-        for c, w, a in items:
-            cc_ = c * S
-            seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
-            if seg[-1] < L * 1.1: continue
-            dd = np.hypot(cc_[:, 0] - ax_, cc_[:, 1] - ay_)
-            j = int(dd.argmin())
-            cands.append((dd[j], cc_, seg, j, w))
+    if isinstance(axis, str):
+        for name, items in river_geo.items():
+            if not re.search(axis, name): continue
+            for c, w, a in items:
+                cc_ = c * S
+                seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
+                if seg[-1] < L * 1.1: continue
+                dd = np.hypot(cc_[:, 0] - ax_, cc_[:, 1] - ay_)
+                j = int(dd.argmin())
+                cands.append((dd[j], cc_, seg, j, w))
+    else:
+        cc_ = np.array([ll2px(lo, la) for lo, la in axis], float)
+        seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
+        tt = np.arange(0, seg[-1], 2.0)
+        cc_ = np.column_stack([np.interp(tt, seg, cc_[:, 0]), np.interp(tt, seg, cc_[:, 1])])
+        seg = tt
+        dd = np.hypot(cc_[:, 0] - ax_, cc_[:, 1] - ay_)
+        cands.append((dd.min(), cc_, seg, int(dd.argmin()), np.zeros(len(cc_))))
     cands.sort(key=lambda t: t[0])
     if not cands or cands[0][0] > 700 * S:
-        print("  sin río para", label); return False
+        print("  sin eje para", label); return False
     _, cc_, seg, j, w = cands[0]
-    s_mid = float(np.clip(seg[j], 0.6 * L, seg[-1] - 0.6 * L))
+    s_mid = float(np.clip(seg[j], 0.55 * L, seg[-1] - 0.55 * L))
     wj = w[min(len(w) - 1, int(np.searchsorted(seg, s_mid)))]
     ok = river_label(cc_ + np.array([OX, OY]), s_mid, label, fnt, color,
                      gap=wj * S / 2 + gap * S, tracking=tracking, halo_w=halo_w)
-    if not ok: print("  no cabe el rótulo de", label)
-    return ok
+    if not ok:
+        # valle corto: rótulo recto centrado sobre el eje, en la misma letra
+        m = len(cc_) // 2
+        put_text(cc_[m, 0] + OX, cc_[m, 1] + OY - 4 * S, label, fnt, color, "mm", tracking=tracking, halo_w=halo_w)
+        print("  rótulo recto para", label)
+    return True
 
-fv = font(EB_I, 58, 420)
-for label, pat, lon, lat in VALLEYS:
-    label_along_river(label, pat, lon, lat, fv, INK_SOFT, 8, 22, 8)
+fv1, fv2 = font(EB_I, 58, 420), font(EB_I, 44, 430)
+for label, axis, lon, lat, size in VALLEYS:
+    if size == 1:
+        label_along_river(label, axis, lon, lat, fv1, INK_SOFT, 8, 22, 8)
+    else:
+        label_along_river(label, axis, lon, lat, fv2, INK_SOFT, 5, 14, 7)
 
 # ---------------- nombres de ríos
 RIVER_INK = (52, 96, 126)
@@ -349,6 +366,11 @@ for name, h, x, y, pos in peak_pts:
     symbols.append(("peak", x, y, 18))
 for name, x, y, pos, pop in town_pts:
     symbols.append(("muni", x, y, muni_radius(pop)))
+poi_pts = []
+for name, lon, lat, pos in POIS:
+    x, y = ll2px(lon, lat)
+    poi_pts.append((name, x + OX, y + OY, pos))
+    symbols.append(("poi", x + OX, y + OY, 15))
 for kind, x, y, rad in symbols:
     rr = (rad + 2) * S
     BOXES.append((x - rr, y - rr, x + rr, y + rr))
@@ -366,6 +388,12 @@ for name, x, y, pos, pop in sorted(town_pts, key=lambda t: -t[4]):
     t = pop_t(pop)
     fm = font(EB, 42 + 18 * t, int(460 + 120 * t))
     ov = place_block(point_cands(x, y, pos, (muni_radius(pop) + 16) * S), [(name, fm, INK, 0)], halo_w=8 + 3 * t)
+    if ov > 0: print("  aviso: solape en", name, int(ov))
+
+# monumentos: rombo y nombre en cursiva
+fpoi = font(EB_I, 44, 470)
+for name, x, y, pos in poi_pts:
+    ov = place_block(point_cands(x, y, pos, 30 * S), [(name, fpoi, INK, 0)], halo_w=8)
     if ov > 0: print("  aviso: solape en", name, int(ov))
 
 # embalses y lagunas: rótulo junto a la lámina de agua real (OSM)
@@ -499,7 +527,7 @@ else:
 KX = LX + LG_W + 230 * S
 KY = SB_Y - 40 * S
 ROW = 92 * S
-key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"),
+key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"), ("poi", "Monumento"),
              ("river", "Río"), ("border", "Frontera"),
              ("major", "Autopista · autovía"), ("primary", "Carretera principal"), ("secondary", "Carretera secundaria")]
 key_lines = []
@@ -508,6 +536,8 @@ for k, (kind, label) in enumerate(key_items):
     x = KX + col * 860 * S; y = KY + row * ROW + 30 * S
     if kind == "peak":
         symbols.append(("peak", x + 45 * S, y, 18))
+    elif kind == "poi":
+        symbols.append(("poi", x + 45 * S, y, 15))
     elif kind == "muni":                       # tres puntos: ~500, ~10.000 y ~200.000 hab.
         for dx_, pp in ((12, 500), (42, 10000), (84, 200000)):
             symbols.append(("muni", x + dx_ * S, y, muni_radius(pp)))
@@ -530,7 +560,7 @@ if STYLE == "color":
         ("Nieve: manto estacional modelado según cota, orientación y pendiente", EB),
     ]
 cred += [
-    ("Ríos, embalses, carreteras, fronteras y población de municipios: © colaboradores de OpenStreetMap (ODbL)", EB),
+    ("Ríos, embalses, carreteras, fronteras, municipios y monumentos: © colaboradores de OpenStreetMap (ODbL)", EB),
     ("Proyección cónica conforme de Lambert · paralelos 42°12′ y 43°12′ N", EB),
     ("Jaca · 2026", EB_I),
 ]
@@ -601,6 +631,12 @@ def ss_symbol(kind, x, y, rad):
         a = 18 * S * k
         pts = [(c, c - a * 1.05), (c - a, c + a * 0.7), (c + a, c + a * 0.7)]
         d.polygon(pts, fill=INK + (255,), outline=PAPER + (255,), width=int(3 * S * k))
+    elif kind == "poi":                         # rombo con centro de papel
+        a = rad * S * k
+        d.polygon([(c, c - a), (c + a, c), (c, c + a), (c - a, c)], fill=INK + (255,), outline=PAPER + (255,),
+                  width=max(1, int(2.5 * S * k)))
+        b = a * 0.38
+        d.polygon([(c, c - b), (c + b, c), (c, c + b), (c - b, c)], fill=PAPER + (255,))
     elif kind == "muni":
         a = rad * S * k
         d.ellipse((c - a, c - a, c + a, c + a), fill=INK + (255,), outline=PAPER + (255,),

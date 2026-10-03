@@ -45,7 +45,7 @@ F=4 ./run_all.sh             # vistas previas rápidas a 1/4 (work/compose*_f4.p
 | 6 | `02_render_relief.py [F] [clasico\|color]` | Sombreado multidireccional (luz del NO), oclusión de valles, sombras frías, perspectiva aérea, agua y mar |
 | 7 | `03_compose.py [F] [clasico\|color]` | Lámina final: ríos y carreteras (`linework.py`), rótulos, gratícula, cartela, leyenda y créditos |
 
-Toponimia en `places.py`: cimas, municipios (con su población, de OpenStreetMap: el punto y el nombre crecen con ella en escala logarítmica) y embalses. Los rótulos se colocan solos en la primera de ocho posiciones alrededor del punto que no pise otro rótulo o símbolo; la posición indicada en `places.py` es solo la preferida.
+Toponimia en `places.py`: cimas, municipios (con su población, de OpenStreetMap: el punto y el nombre crecen con ella en escala logarítmica), monumentos, embalses y valles (rotulados a lo largo de su río o de su eje). Los rótulos se colocan solos en la primera de ocho posiciones alrededor del punto que no pise otro rótulo o símbolo; la posición indicada en `places.py` es solo la preferida.
 En `08_color_base.py` se ajustan los colores por cobertura, el peso del satélite y la cota de nieve.
 
 ## Imprimir

@@ -105,6 +105,14 @@ TOWNS = [
     ("Prades",                2.4231, 42.6181, "r",   6124),
     ("Céret",                 2.7487, 42.4857, "r",   7648),
     ("Mauléon",              -0.8886, 43.2233, "r",   2954),
+    ("Cadaqués",              3.2752, 42.2893, "l",   2906),
+    ("Ayerbe",               -0.6892, 42.2764, "l",   1051),
+]
+
+# Monumentos y lugares de interés: nombre, lon, lat, posición preferida (coordenadas de OpenStreetMap)
+POIS = [
+    ("San Juan de la Peña",  -0.6730, 42.5075, "b"),
+    ("Castillo de Loarre",   -0.6127, 42.3254, "r"),
 ]
 
 # Embalses y lagunas con nombre: rótulo, lon, lat (punto dentro o junto a la lámina de agua OSM)
@@ -141,9 +149,18 @@ AREAS = [
 
 # Valles rotulados a lo largo de su río (como los nombres de río, pero en el estilo de valle):
 # rótulo, patrón del río OSM (regex), lon, lat del centro del rótulo
+# El segundo campo es el río de OSM (regex) o, si no hay río cartografiado, el eje del valle
+# como lista de (lon, lat) tomada de OSM (natural=valley o el sendero que lo recorre).
+# Tamaño: 1 valle principal, 2 valle secundario (letra más pequeña).
 VALLEYS = [
-    ("Valle del Aragón",   r"^Río Aragón$",          -0.532, 42.640),
-    ("Vallée d'Aspe",      r"^Le Gave d'Aspe$",      -0.585, 42.930),
+    ("Valle del Aragón",   r"^Río Aragón$",          -0.532, 42.640, 1),
+    ("Vallée d'Aspe",      r"^Le Gave d'Aspe$",      -0.585, 42.930, 1),
+    ("Valle de Aísa",      r"Estarrún$",             -0.620, 42.650, 2),
+    ("Bujaruelo",          r"^R[ií]o Ara$",          -0.112, 42.675, 2),
+    ("Valle de Pineta",    [(0.0857, 42.6726), (0.1392, 42.6471), (0.1914, 42.632), (0.2131, 42.6341)],
+                           0.140, 42.647, 2),
+    ("Canal Roya",         [(-0.5071, 42.7734), (-0.4834, 42.7898), (-0.4623, 42.7971), (-0.4534, 42.7928),
+                            (-0.447, 42.7823)], -0.480, 42.789, 2),
 ]
 
 # Ríos: rótulo, patrón del nombre OSM (regex), lon, lat del punto donde centrar el rótulo, tamaño
