@@ -124,6 +124,10 @@ def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
                     de.line(hh + [hh[0]], fill=255, width=max(1, int(2.6 * sc)))
     composite(fill, LAKE_FILL)
     composite(edge, LAKE_EDGE, 0.9)
+    # máscara de embalses y lagos (a 1x) para que los ríos no se dibujen por dentro;
+    # se erosiona ~6 px para que el río llegue hasta la orilla y para ignorar riberas estrechas
+    water1x = np.asarray(fill.resize((MW, MH), Image.BOX)) > 127
+    water1x = nd.binary_erosion(water1x, iterations=max(1, int(round(6 * S))))
     del fill, edge
 
     # ---------- ríos con grosor según cuenca
@@ -149,6 +153,10 @@ def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
     if sea_mask is not None:
         sm = Image.fromarray((sea_mask * 255).astype(np.uint8)).resize((MW * K, MH * K))
         m.paste(0, (0, 0), sm)
-    composite(m, RIVER)
+    m1 = np.asarray(m.resize((MW, MH), Image.BOX)).copy()
     del m
+    m1[water1x] = 0                                   # dentro de embalses y lagos se ve el agua, no el río
+    del water1x
+    canvas.paste(Image.new("RGB", (MW, MH), RIVER), (OX, OY), Image.fromarray(m1))
+    del m1
     return widths

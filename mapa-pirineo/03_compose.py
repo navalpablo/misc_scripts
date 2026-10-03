@@ -231,10 +231,9 @@ def label_along_river(label, axis, lon, lat, fnt, color, tracking, gap, halo_w):
             for c, w, a in items:
                 cc_ = c * S
                 seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
-                if seg[-1] < L * 1.1: continue
                 dd = np.hypot(cc_[:, 0] - ax_, cc_[:, 1] - ay_)
                 j = int(dd.argmin())
-                cands.append((dd[j], cc_, seg, j, w))
+                cands.append((dd[j], cc_, seg, j, w))       # tramo más cercano, aunque sea corto
     else:
         cc_ = np.array([ll2px(lo, la) for lo, la in axis], float)
         seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
@@ -249,12 +248,16 @@ def label_along_river(label, axis, lon, lat, fnt, color, tracking, gap, halo_w):
     _, cc_, seg, j, w = cands[0]
     s_mid = float(np.clip(seg[j], 0.55 * L, seg[-1] - 0.55 * L))
     wj = w[min(len(w) - 1, int(np.searchsorted(seg, s_mid)))]
-    ok = river_label(cc_ + np.array([OX, OY]), s_mid, label, fnt, color,
+    ok = seg[-1] >= L * 1.1 and river_label(cc_ + np.array([OX, OY]), s_mid, label, fnt, color,
                      gap=wj * S / 2 + gap * S, tracking=tracking, halo_w=halo_w)
     if not ok:
         # valle corto: rótulo recto centrado sobre el eje, en la misma letra
-        m = len(cc_) // 2
-        put_text(cc_[m, 0] + OX, cc_[m, 1] + OY - 4 * S, label, fnt, color, "mm", tracking=tracking, halo_w=halo_w)
+        if isinstance(axis, str):      # junto al río, a la altura del punto indicado
+            put_text(cc_[j, 0] + OX + wj * S / 2 + 16 * S, cc_[j, 1] + OY, label, fnt, color, "lm",
+                     tracking=tracking, halo_w=halo_w)
+        else:                          # sin río dibujado: centrado sobre el eje del valle
+            m = len(cc_) // 2
+            put_text(cc_[m, 0] + OX, cc_[m, 1] + OY - 4 * S, label, fnt, color, "mm", tracking=tracking, halo_w=halo_w)
         print("  rótulo recto para", label)
     return True
 

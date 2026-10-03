@@ -113,6 +113,13 @@ TOWNS = [
 POIS = [
     ("San Juan de la Peña",  -0.6730, 42.5075, "b"),
     ("Castillo de Loarre",   -0.6127, 42.3254, "r"),
+    ("Monasterio de Leyre",  -1.1709, 42.6363, "t"),
+    ("Castillo de Javier",   -1.2158, 42.5941, "b"),
+    ("Torreciudad",           0.2350, 42.1704, "l"),
+    ("Roda de Isábena",       0.5282, 42.2916, "r"),
+    ("Saint-Bertrand-de-Comminges", 0.5714, 43.0267, "r"),
+    ("Montségur",             1.8325, 42.8757, "r"),
+    ("Sant Pere de Rodes",    3.1663, 42.3233, "t"),
 ]
 
 # Embalses y lagunas con nombre: rótulo, lon, lat (punto dentro o junto a la lámina de agua OSM)
@@ -159,6 +166,12 @@ VALLEYS = [
     ("Bujaruelo",          r"^R[ií]o Ara$",          -0.112, 42.675, 2),
     ("Valle de Pineta",    [(0.0857, 42.6726), (0.1392, 42.6471), (0.1914, 42.632), (0.2131, 42.6341)],
                            0.140, 42.647, 2),
+    ("Valle de Ansó",      r"^Río Veral$",           -0.835, 42.800, 2),
+    ("Valle de Hecho",     r"Subordán",              -0.735, 42.800, 2),
+    ("Valle de Roncal",    r"^(Esca|Ezka)$",         -0.965, 42.775, 2),
+    ("Valle de Salazar",   r"Salazar|Zaraitzu",      -1.125, 42.840, 2),
+    ("Valle de Chistau",   r"Cinqueta$",              0.330, 42.590, 2),
+    ("Vall de Boí",        r"Noguera de Tor",         0.810, 42.480, 2),
     ("Canal Roya",         [(-0.5071, 42.7734), (-0.4834, 42.7898), (-0.4623, 42.7971), (-0.4534, 42.7928),
                             (-0.447, 42.7823)], -0.480, 42.789, 2),
 ]
