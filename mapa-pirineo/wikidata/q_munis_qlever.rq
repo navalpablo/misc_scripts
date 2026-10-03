@@ -1,0 +1,21 @@
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX wikibase: <http://wikiba.se/ontology#>
+PREFIX schema: <http://schema.org/>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+SELECT ?item ?lon ?lat (MAX(?p) AS ?pop) (SAMPLE(?sl) AS ?sitelinks) (SAMPLE(?es) AS ?les) (SAMPLE(?ca) AS ?lca) (SAMPLE(?eu) AS ?leu) (SAMPLE(?fr) AS ?lfr) (GROUP_CONCAT(DISTINCT ?reg; separator=",") AS ?regs) WHERE {
+  VALUES ?t { wd:Q2074737 wd:Q33146843 wd:Q484170 wd:Q24279 wd:Q61763947 }
+  ?item wdt:P31 ?t .
+  ?item wdt:P625 ?coord .
+  BIND(geof:longitude(?coord) AS ?lon) BIND(geof:latitude(?coord) AS ?lat)
+  FILTER(?lon > -2.15 && ?lon < 3.50 && ?lat > 41.94 && ?lat < 43.62)
+  ?item wdt:P1082 ?p .
+  OPTIONAL { ?item wikibase:sitelinks ?sl }
+  OPTIONAL { ?item rdfs:label ?es FILTER(LANG(?es)="es") }
+  OPTIONAL { ?item rdfs:label ?ca FILTER(LANG(?ca)="ca") }
+  OPTIONAL { ?item rdfs:label ?eu FILTER(LANG(?eu)="eu") }
+  OPTIONAL { ?item rdfs:label ?fr FILTER(LANG(?fr)="fr") }
+  OPTIONAL { ?item wdt:P131+ ?reg . VALUES ?reg { wd:Q5705 wd:Q4018 wd:Q95010 wd:Q4040 wd:Q228 } }
+}
+GROUP BY ?item ?lon ?lat

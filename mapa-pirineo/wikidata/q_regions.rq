@@ -1,0 +1,12 @@
+PREFIX wd: <http://www.wikidata.org/entity/>
+PREFIX wdt: <http://www.wikidata.org/prop/direct/>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+SELECT ?item ?reg WHERE {
+  VALUES ?t { wd:Q2074737 wd:Q33146843 wd:Q24279 wd:Q61763947 }
+  ?item wdt:P31 ?t .
+  ?item wdt:P625 ?coord .
+  BIND(geof:longitude(?coord) AS ?lon) BIND(geof:latitude(?coord) AS ?lat)
+  FILTER(?lon > -2.15 && ?lon < 3.50 && ?lat > 41.94 && ?lat < 43.62)
+  ?item wdt:P131+ ?reg .
+  VALUES ?reg { wd:Q5705 wd:Q4018 wd:Q95010 wd:Q4040 wd:Q228 wd:Q93146 wd:Q81803 wd:Q5687 wd:Q7194 wd:Q13904 }
+}

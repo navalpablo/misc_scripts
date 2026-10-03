@@ -6,3 +6,4 @@ output/
 __pycache__/
 landcover/
 s2/
+wikidata/*.json

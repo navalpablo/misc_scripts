@@ -121,20 +121,21 @@ def offset(pos, d):
             "tr": (d * .7, -d * .7, "lb"), "tl": (-d * .7, -d * .7, "rb"),
             "br": (d * .7, d * .7, "lt"), "bl": (-d * .7, d * .7, "rt")}[pos]
 
-def river_label(c, s_mid, txt, f, color, gap, tracking=0, halo_w=8):
+def river_label(c, s_mid, txt, f, color, gap, tracking=0, halo_w=8, dry=False, shifts=(0, -0.6, 0.6, -1.2, 1.2, -2.0, 2.0)):
     adv = [f.getlength(ch) + tracking * S for ch in txt]
     L = sum(adv) - tracking * S
     seg = np.r_[0, np.cumsum(np.hypot(*np.diff(c, axis=0).T))]
     for span in (0.85, 1.15, 1.5):
-        for shift in (0, -0.6, 0.6, -1.2, 1.2, -2.0, 2.0):
+        for shift in shifts:
             if seg[-1] < 1.05 * L:
                 return False
             sm = float(np.clip(s_mid + shift * L, 0.55 * L, seg[-1] - 0.55 * L))
-            if _river_label(c, sm, txt, f, color, gap, tracking, halo_w, span):
-                return True
+            res = _river_label(c, sm, txt, f, color, gap, tracking, halo_w, span, dry)
+            if res:
+                return res
     return False
 
-def _river_label(c, s_mid, txt, f, color, gap, tracking, halo_w, span):
+def _river_label(c, s_mid, txt, f, color, gap, tracking, halo_w, span, dry=False):
     """Rótulo de río a lo largo de una curva suave (parábola ajustada al cauce en el
     tramo del rótulo), desplazada para no tocar el cauce. c: polilínea en px de lámina."""
     adv = [f.getlength(ch) + tracking * S for ch in txt]
@@ -176,6 +177,14 @@ def _river_label(c, s_mid, txt, f, color, gap, tracking, halo_w, span):
     smid = np.interp(u0, uu, ss)
     pos = smid - L / 2
     hw = int(halo_w * S)
+    if dry:                                   # solo las cajas de cada letra, sin dibujar
+        out = []
+        for ch, a_ in zip(txt, adv):
+            sc_ = pos + (a_ - tracking * S) / 2; pos += a_
+            if ch == " ": continue
+            x = np.interp(sc_, ss, P[:, 0]); y = np.interp(sc_, ss, P[:, 1])
+            out.append((x - a_ / 2, y - cap * 1.05, x + a_ / 2, y + cap * 0.3))
+        return out
     for ch, a_ in zip(txt, adv):
         sc_ = pos + (a_ - tracking * S) / 2
         pos += a_
@@ -201,6 +210,94 @@ def _river_label(c, s_mid, txt, f, color, gap, tracking, halo_w, span):
     return True
 
 symbols = []   # (tipo, x, y) se dibujan sobre el relieve con antialias via supersample
+
+# ---------------- colocación de rótulos puntuales sin solapes
+MAPBOX = (OX, OY, OX + MW, OY + MH)
+PAD = 6 * S
+
+def overlap(box):
+    x0, y0, x1, y1 = box[0] - PAD, box[1] - PAD, box[2] + PAD, box[3] + PAD
+    tot = 0.0
+    for b0, b1, b2, b3 in BOXES:
+        w = min(x1, b2) - max(x0, b0); h = min(y1, b3) - max(y0, b1)
+        if w > 0 and h > 0: tot += w * h
+    # fuera del marco del mapa: penalización fuerte
+    out = (max(0, MAPBOX[0] - box[0]) + max(0, box[2] - MAPBOX[2]) +
+           max(0, MAPBOX[1] - box[1]) + max(0, box[3] - MAPBOX[3]))
+    return tot + out * 1e4
+
+def line_metrics(f):
+    bb = f.getbbox("Hg"); return bb[1], bb[3]
+
+def place_block(cands, lines, halo_w=10, strict=False):
+    """cands: [(x, y, anchor)] en orden de preferencia; lines: [(texto, fuente, color, tracking)].
+    Coloca el bloque de líneas en el primer candidato libre (o en el de menor solape)."""
+    ws = [text_size(t, f, tr)[0] for t, f, c, tr in lines]
+    mets = [line_metrics(f) for t, f, c, tr in lines]
+    hs = [m1 - m0 for m0, m1 in mets]
+    gap = -0.08 * max(hs)
+    BW = max(ws); BH = sum(hs) + gap * (len(lines) - 1)
+    best = None
+    for x, y, anc in cands:
+        bx = {"l": x, "m": x - BW / 2, "r": x - BW}[anc[0]]
+        by = {"t": y, "m": y - BH / 2, "b": y - BH}[anc[1]]
+        box = (bx, by, bx + BW, by + BH)
+        ov = overlap(box)
+        if best is None or ov < best[0]:
+            best = (ov, bx, by, anc, box)
+        if ov == 0:
+            break
+    ov, bx, by, anc, box = best
+    if strict and ov > 0:
+        return None
+    cy = by
+    for (t, f, c, tr), w, (m0, m1), hh in zip(lines, ws, mets, hs):
+        lx = {"l": bx, "m": bx + (BW - w) / 2, "r": bx + BW - w}[anc[0]]
+        _draw_run(layer(c), hd, lx - (f.getbbox(t)[0] if tr == 0 else 0), cy - m0, t, f, tr, int(halo_w * S))
+        cy += hh + gap
+    BOXES.append(box)
+    return ov
+
+ORDER = ["r", "l", "t", "b", "tr", "tl", "br", "bl"]
+def point_cands(x, y, pref, d):
+    out = []
+    for p in [pref] + [q for q in ORDER if q != pref]:
+        dx, dy, anc = offset(p, d)
+        out.append((x + dx, y + dy, anc))
+    return out
+
+# posiciones de todos los símbolos primero, para que ningún rótulo los tape
+R = max(3, int(45 / SX))
+peak_pts = []
+for name, h, lon, lat, pos in PEAKS:
+    x, y = ll2px(lon, lat)
+    c, r = int(round(x)), int(round(y))
+    w = dem[r - R:r + R, c - R:c + R]
+    i, j = np.unravel_index(np.argmax(w), w.shape)    # cima ajustada al máximo real del DEM (~1.2 km)
+    peak_pts.append((name, h, c - R + j + OX, r - R + i + OY, pos))
+def pop_t(pop):
+    """0 para municipios de ~250 hab., 1 para ~200.000 hab. (escala logarítmica)."""
+    return float(np.clip((np.log10(max(pop, 1)) - 2.4) / 2.9, 0, 1))
+def muni_radius(pop):
+    return 7.5 + 10.5 * pop_t(pop)            # px a resolución completa
+town_pts = []
+for name, lon, lat, pos, pop in TOWNS:
+    x, y = ll2px(lon, lat)
+    town_pts.append((name, x + OX, y + OY, pos, pop))
+for name, h, x, y, pos in peak_pts:
+    symbols.append(("peak", x, y, 18))
+for name, x, y, pos, pop in town_pts:
+    symbols.append(("muni", x, y, muni_radius(pop)))
+poi_pts = []
+for name, lon, lat, pos in POIS:
+    x, y = ll2px(lon, lat)
+    poi_pts.append((name, x + OX, y + OY, pos))
+    symbols.append(("poi", x + OX, y + OY, 15))
+for kind, x, y, rad in symbols:
+    rr = (rad + 2) * S
+    BOXES.append((x - rr, y - rr, x + rr, y + rr))
+
+
 
 # ---------------- áreas (debajo del resto)
 for txt, lon, lat, style in AREAS:
@@ -294,90 +391,6 @@ for label, pat, lon, lat, rank in RIVERS:
                        gap=wj * S / 2 + 14 * S, tracking=8, halo_w=7):
         print("  río demasiado corto para el rótulo:", label)
 
-# ---------------- colocación de rótulos puntuales sin solapes
-MAPBOX = (OX, OY, OX + MW, OY + MH)
-PAD = 6 * S
-
-def overlap(box):
-    x0, y0, x1, y1 = box[0] - PAD, box[1] - PAD, box[2] + PAD, box[3] + PAD
-    tot = 0.0
-    for b0, b1, b2, b3 in BOXES:
-        w = min(x1, b2) - max(x0, b0); h = min(y1, b3) - max(y0, b1)
-        if w > 0 and h > 0: tot += w * h
-    # fuera del marco del mapa: penalización fuerte
-    out = (max(0, MAPBOX[0] - box[0]) + max(0, box[2] - MAPBOX[2]) +
-           max(0, MAPBOX[1] - box[1]) + max(0, box[3] - MAPBOX[3]))
-    return tot + out * 1e4
-
-def line_metrics(f):
-    bb = f.getbbox("Hg"); return bb[1], bb[3]
-
-def place_block(cands, lines, halo_w=10):
-    """cands: [(x, y, anchor)] en orden de preferencia; lines: [(texto, fuente, color, tracking)].
-    Coloca el bloque de líneas en el primer candidato libre (o en el de menor solape)."""
-    ws = [text_size(t, f, tr)[0] for t, f, c, tr in lines]
-    mets = [line_metrics(f) for t, f, c, tr in lines]
-    hs = [m1 - m0 for m0, m1 in mets]
-    gap = -0.08 * max(hs)
-    BW = max(ws); BH = sum(hs) + gap * (len(lines) - 1)
-    best = None
-    for x, y, anc in cands:
-        bx = {"l": x, "m": x - BW / 2, "r": x - BW}[anc[0]]
-        by = {"t": y, "m": y - BH / 2, "b": y - BH}[anc[1]]
-        box = (bx, by, bx + BW, by + BH)
-        ov = overlap(box)
-        if best is None or ov < best[0]:
-            best = (ov, bx, by, anc, box)
-        if ov == 0:
-            break
-    ov, bx, by, anc, box = best
-    cy = by
-    for (t, f, c, tr), w, (m0, m1), hh in zip(lines, ws, mets, hs):
-        lx = {"l": bx, "m": bx + (BW - w) / 2, "r": bx + BW - w}[anc[0]]
-        _draw_run(layer(c), hd, lx - (f.getbbox(t)[0] if tr == 0 else 0), cy - m0, t, f, tr, int(halo_w * S))
-        cy += hh + gap
-    BOXES.append(box)
-    return ov
-
-ORDER = ["r", "l", "t", "b", "tr", "tl", "br", "bl"]
-def point_cands(x, y, pref, d):
-    out = []
-    for p in [pref] + [q for q in ORDER if q != pref]:
-        dx, dy, anc = offset(p, d)
-        out.append((x + dx, y + dy, anc))
-    return out
-
-# posiciones de todos los símbolos primero, para que ningún rótulo los tape
-R = max(3, int(45 / SX))
-peak_pts = []
-for name, h, lon, lat, pos in PEAKS:
-    x, y = ll2px(lon, lat)
-    c, r = int(round(x)), int(round(y))
-    w = dem[r - R:r + R, c - R:c + R]
-    i, j = np.unravel_index(np.argmax(w), w.shape)    # cima ajustada al máximo real del DEM (~1.2 km)
-    peak_pts.append((name, h, c - R + j + OX, r - R + i + OY, pos))
-def pop_t(pop):
-    """0 para municipios de ~250 hab., 1 para ~200.000 hab. (escala logarítmica)."""
-    return float(np.clip((np.log10(max(pop, 1)) - 2.4) / 2.9, 0, 1))
-def muni_radius(pop):
-    return 7.5 + 10.5 * pop_t(pop)            # px a resolución completa
-town_pts = []
-for name, lon, lat, pos, pop in TOWNS:
-    x, y = ll2px(lon, lat)
-    town_pts.append((name, x + OX, y + OY, pos, pop))
-for name, h, x, y, pos in peak_pts:
-    symbols.append(("peak", x, y, 18))
-for name, x, y, pos, pop in town_pts:
-    symbols.append(("muni", x, y, muni_radius(pop)))
-poi_pts = []
-for name, lon, lat, pos in POIS:
-    x, y = ll2px(lon, lat)
-    poi_pts.append((name, x + OX, y + OY, pos))
-    symbols.append(("poi", x + OX, y + OY, 15))
-for kind, x, y, rad in symbols:
-    rr = (rad + 2) * S
-    BOXES.append((x - rr, y - rr, x + rr, y + rr))
-
 # cimas (de mayor a menor altitud)
 fh = font(EB_I, 44, 420)
 for name, h, x, y, pos in sorted(peak_pts, key=lambda t: -t[1]):
@@ -421,6 +434,127 @@ for label, lon, lat in RESERVOIRS:
         cands = cands[2:4] + cands[:2] + cands[4:]
     ov = place_block(cands, [(label, fw, WATER_LABEL, 0)], halo_w=8)
     if ov > 0: print("  aviso: solape en", label, int(ov))
+
+# ================= rótulos automáticos (09_select_labels.py): mismo criterio en todo el mapa =================
+# Se colocan después de todo lo elegido a mano y SOLO si caben sin pisar nada; si no, se descartan.
+import json as _json
+AUTO = _json.load(open("work/auto_labels.json")) if os.path.exists("work/auto_labels.json") else {}
+
+def try_symbol_label(kind, x, y, rad, cands, lines, halo_w):
+    rr = (rad + 2) * S
+    sbox = (x - rr, y - rr, x + rr, y + rr)
+    if overlap(sbox) > 0:
+        return False
+    BOXES.append(sbox)
+    if place_block(cands, lines, halo_w=halo_w, strict=True) is None:
+        BOXES.remove(sbox); return False
+    symbols.append((kind, x, y, rad)); return True
+
+def try_river_text(cc_, s_mid, label, fnt, color, gap, tracking, halo_w):
+    """Rótulo curvo junto a la polilínea cc_ (px de lámina) solo si no pisa nada."""
+    boxes = river_label(cc_, s_mid, label, fnt, color, gap=gap, tracking=tracking, halo_w=halo_w,
+                        dry=True, shifts=(0,))
+    if not boxes or any(overlap(b) > 0 for b in boxes):
+        return False
+    river_label(cc_, s_mid, label, fnt, color, gap=gap, tracking=tracking, halo_w=halo_w, shifts=(0,))
+    return True
+
+# ---- ríos: todos los que drenan ≥ 300 km² dentro del mapa (área de cuenca del DEM)
+def clean_river(n):
+    n = n.split(" / ")[0].strip()
+    n = re.sub(r"^(?:r[ií]o|riu|arriu|rivière|ribera)\s+", "", n, flags=re.I)
+    n = re.sub(r"^(?:de\s+la|de\s+les|de\s+los|dels|del|de|d['’])\s*", "", n, flags=re.I)
+    n = re.sub(r"^(?:el|la|les|los|las|lo|le)\s+|^l['’]", "", n, flags=re.I)
+    n = re.sub(r"\s+(?:ibaia|erreka)$", "", n)
+    return n[:1].upper() + n[1:]
+SKIP_RIVER = re.compile(r"^(Barranc|Ruisseau|Canal|Rec\b|Arroyo|Regata|Torrent|Riera|Rambla|Acequia|Ravin|Fosse|Ríu)", re.I)
+used = ([re.compile(p) for _, p, *_ in RIVERS] + [re.compile(v[1]) for v in VALLEYS if isinstance(v[1], str)]
+        + [re.compile(r"^Aragoi|Garona|^Segre|^Cinca|^Ebro|^Ebre|^R[ií]o Ara$|Gállego|sera$|Ribagor")])
+rcands = []
+for name, items in river_geo.items():
+    if not name or any(p.search(name) for p in used) or SKIP_RIVER.search(name):
+        continue
+    amax = max(float(a.max()) for c, w, a in items)
+    if amax < 300: continue
+    rcands.append((amax, name, items))
+n_riv = 0
+for amax, name, items in sorted(rcands, key=lambda t: -t[0]):
+    label = clean_river(name)
+    fr = font(EB_I, 54 if amax >= 2000 else 46, 460)
+    L = sum(fr.getlength(ch) + 8 * S for ch in label)
+    c, w, a = max(items, key=lambda t: len(t[0]))
+    cc_ = c * S + np.array([OX, OY])
+    seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
+    if seg[-1] < L * 1.3: continue
+    placed = []
+    for fr_ in (0.5, 0.35, 0.65, 0.25, 0.75, 0.15, 0.85):
+        sm = fr_ * seg[-1]
+        if any(abs(sm - p) < 2400 * S for p in placed): continue      # 2.º rótulo a ≥ 65 km del 1.º
+        wj = w[min(len(w) - 1, int(np.searchsorted(seg, sm)))]
+        if try_river_text(cc_, sm, label, fr, RIVER_INK, wj * S / 2 + 14 * S, 8, 7):
+            placed.append(sm); n_riv += 1
+            if len(placed) >= (2 if seg[-1] > 4400 * S else 1): break
+print("  ríos automáticos:", n_riv)
+
+# ---- municipios (por relevancia)
+n_t = 0
+for t in AUTO.get("towns", []):
+    x, y = ll2px(t["lon"], t["lat"]); x += OX; y += OY
+    tt = pop_t(t["pop"]); rad = muni_radius(t["pop"])
+    fm = font(EB, 42 + 18 * tt, int(460 + 120 * tt))
+    if try_symbol_label("muni", x, y, rad, point_cands(x, y, "r", (rad + 16) * S),
+                        [(t["name"], fm, INK, 0)], 8 + 3 * tt):
+        n_t += 1
+print("  municipios automáticos:", n_t, "de", len(AUTO.get("towns", [])))
+
+# ---- valles: a lo largo del río más cercano (≤ 2,5 km) o rótulo recto
+n_v = 0
+for v in AUTO.get("valleys", []):
+    ax_, ay_ = ll2px(v["lon"], v["lat"])
+    L = sum(fv2.getlength(ch) + 5 * S for ch in v["name"])
+    best = None
+    for name, items in river_geo.items():
+        for c, w, a in items:
+            cc_ = c * S
+            dd = np.hypot(cc_[:, 0] - ax_, cc_[:, 1] - ay_); j = int(dd.argmin())
+            if dd[j] < 93 * S and (best is None or dd[j] < best[0]):
+                best = (dd[j], cc_, j, w)
+    ok = False
+    if best is not None:
+        _, cc_, j, w = best
+        seg = np.r_[0, np.cumsum(np.hypot(*np.diff(cc_, axis=0).T))]
+        if seg[-1] >= L * 1.1:
+            sm = float(np.clip(seg[j], 0.55 * L, seg[-1] - 0.55 * L))
+            ok = try_river_text(cc_ + np.array([OX, OY]), sm, v["name"], fv2, INK_SOFT,
+                                w[min(len(w) - 1, j)] * S / 2 + 14 * S, 5, 7)
+    if not ok:
+        x, y = ax_ + OX, ay_ + OY
+        ok = place_block([(x, y, "mm"), (x, y - 40 * S, "mm"), (x, y + 40 * S, "mm"), (x + 40 * S, y, "lm"),
+                          (x - 40 * S, y, "rm")], [(v["name"], fv2, INK_SOFT, 5)], halo_w=7, strict=True) is not None
+    n_v += ok
+print("  valles automáticos:", n_v, "de", len(AUTO.get("valleys", [])))
+
+# ---- cimas (dominan 8 km a la redonda)
+n_p = 0
+for p in AUTO.get("peaks", []):
+    x, y = ll2px(p["lon"], p["lat"])
+    c, r = int(round(x)), int(round(y))
+    w = dem[max(0, r - R):r + R, max(0, c - R):c + R]
+    i, j = np.unravel_index(np.argmax(w), w.shape)
+    x, y = max(0, c - R) + j + OX, max(0, r - R) + i + OY
+    fn = font(EB, 62 if p["ele"] >= 3000 else 54, 580 if p["ele"] >= 3000 else 500)
+    if try_symbol_label("peak", x, y, 18, point_cands(x, y, "r", 50 * S),
+                        [(p["name"], fn, INK, 0), (f"{p['ele']:,}".replace(",", "."), fh, INK_SOFT, 0)], 10):
+        n_p += 1
+print("  cimas automáticas:", n_p, "de", len(AUTO.get("peaks", [])))
+
+# ---- monumentos
+n_m = 0
+for p in AUTO.get("pois", []):
+    x, y = ll2px(p["lon"], p["lat"]); x += OX; y += OY
+    if try_symbol_label("poi", x, y, 15, point_cands(x, y, "r", 30 * S), [(p["name"], fpoi, INK, 0)], 8):
+        n_m += 1
+print("  monumentos automáticos:", n_m, "de", len(AUTO.get("pois", [])))
 
 # ---------------- gratícula en el marco
 def edge_crossings():
@@ -564,6 +698,7 @@ if STYLE == "color":
     ]
 cred += [
     ("Ríos, embalses, carreteras, fronteras, municipios y monumentos: © colaboradores de OpenStreetMap (ODbL)", EB),
+    ("Selección de municipios, monumentos y valles por relevancia: Wikidata (CC0)", EB),
     ("Proyección cónica conforme de Lambert · paralelos 42°12′ y 43°12′ N", EB),
     ("Jaca · 2026", EB_I),
 ]

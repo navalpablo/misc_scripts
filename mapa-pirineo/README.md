@@ -23,6 +23,7 @@ Hay dos versiones con la misma cartografía y rotulación:
 | Grosor de los ríos (crece aguas abajo) | Área de cuenca calculada sobre el mismo DEM (`pysheds`) |
 | Ríos, lagos, embalses, ibones, carreteras (autopistas, principales y secundarias), frontera, posición y población de municipios, nombres de embalses | © colaboradores de OpenStreetMap (ODbL), vía teselas OpenMapTiles de OpenFreeMap y Nominatim |
 | Cimas | Coordenadas públicas, recolocadas sobre el máximo real del DEM; altitudes oficiales |
+| Selección homogénea de municipios, monumentos, valles y cimas adicionales | Wikidata (CC0): población y nº de Wikipedias; cimas OSM que dominan 8 km a la redonda en el DEM; ríos con ≥ 300 km² de cuenca |
 | Tipografías | Cormorant Garamond, EB Garamond, Josefin Sans (SIL OFL) |
 
 ## Cómo se genera
@@ -42,10 +43,11 @@ F=4 ./run_all.sh             # vistas previas rápidas a 1/4 (work/compose*_f4.p
 | 3 | `05_download_color.sh` | (color) Descarga WorldCover (~450 MB) y las teselas Sentinel-2 cloudless (~120 MB) |
 | 4 | `06_landcover.py`, `07_satellite.py` | (color) Reproyectan cobertura y satélite al grid del mapa |
 | 5 | `08_color_base.py` | (color) Mezcla en CIELAB la paleta por cobertura con el tono del satélite aclarado, y añade la nieve |
+| 5b | `05b_wikidata.sh`, `09_select_labels.py` | Relevancia desde Wikidata y selección con el mismo criterio en todo el mapa (distancia mínima entre rótulos del mismo tipo) |
 | 6 | `02_render_relief.py [F] [clasico\|color]` | Sombreado multidireccional (luz del NO), oclusión de valles, sombras frías, perspectiva aérea, agua y mar |
 | 7 | `03_compose.py [F] [clasico\|color]` | Lámina final: ríos y carreteras (`linework.py`), rótulos, gratícula, cartela, leyenda y créditos |
 
-Toponimia en `places.py`: cimas, municipios (con su población, de OpenStreetMap: el punto y el nombre crecen con ella en escala logarítmica), monumentos, embalses y valles (rotulados a lo largo de su río o de su eje). Los rótulos se colocan solos en la primera de ocho posiciones alrededor del punto que no pise otro rótulo o símbolo; la posición indicada en `places.py` es solo la preferida.
+Toponimia en `places.py`: cimas, municipios (con su población, de OpenStreetMap: el punto y el nombre crecen con ella en escala logarítmica), monumentos, embalses y valles (rotulados a lo largo de su río o de su eje). Los rótulos se colocan solos en la primera de ocho posiciones alrededor del punto que no pise otro rótulo o símbolo; la posición indicada en `places.py` es solo la preferida. Lo elegido a mano en `places.py` se coloca primero; lo automático solo entra si cabe sin pisar nada.
 En `08_color_base.py` se ajustan los colores por cobertura, el peso del satélite y la cota de nieve.
 
 ## Imprimir

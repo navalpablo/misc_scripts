@@ -10,6 +10,9 @@ STYLES=${STYLES:-"clasico color"}
 ./00_download.sh
 python3 01_prepare_dem.py
 python3 04_osm_hydro_roads.py
+[ -f work/mask_sea_f4.npy ] || python3 02_render_relief.py 4 clasico     # máscara de mar para 09
+./05b_wikidata.sh
+python3 09_select_labels.py          # rótulos automáticos con el mismo criterio en todo el mapa
 for st in $STYLES; do
   if [ "$st" = "color" ]; then
     ./05_download_color.sh
