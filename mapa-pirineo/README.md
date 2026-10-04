@@ -52,6 +52,15 @@ F=4 ./run_all.sh             # vistas previas rápidas a 1/4 (work/compose*_f4.p
 Toponimia en `places.py`: cimas, municipios (con su población, de OpenStreetMap: el punto y el nombre crecen con ella en escala logarítmica), monumentos y lugares de interés cultural (y alguno personal, como La Huerta), embalses, valles (rotulados a lo largo de su río o de su eje), parajes naturales (cursiva verde), puertos de montaña (Monrepós y Somport siempre; el resto solo si caben). Los monumentos ya elegidos quedan fijados en `POIS_WD`; los nuevos de Wikidata solo entran donde quepan sin pisar nada. Los rótulos se colocan solos en la primera de ocho posiciones alrededor del punto que no pise otro rótulo o símbolo; la posición indicada en `places.py` es solo la preferida. Lo elegido a mano en `places.py` se coloca primero; lo automático solo entra si cabe sin pisar nada.
 En `08_color_base.py` se ajustan los colores por cobertura, el peso del satélite y la cota de nieve.
 
+## Versión buena y alternativa
+
+- **Versión buena** (la de referencia para imprimir): la rama `pirineo-definitiva` de este repositorio guarda
+  el código exacto con el que se generó. `./run_all.sh` sin más opciones la reproduce.
+- **Versión alternativa** (`VARIANT=alt python3 03_compose.py 1 color`, tras `python3 04c_osm_tunnels.py`):
+  mismos datos y rótulos, con retoques de acabado. Los túneles de carretera van en discontinuo en vez de
+  cortar la carretera. Los halos de los rótulos son más finos y nítidos. El marco va graduado de 5′ en 5′.
+  Sale como `output/pirineo_color_alt_150cm.*` y no toca la versión buena.
+
 ## Imprimir
 
 - Archivos: `output/pirineo_color_150cm.tif` o `output/pirineo_150cm.tif` (17.731 × 8.286 px, 301 ppp, RGB).

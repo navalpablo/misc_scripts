@@ -23,6 +23,11 @@ F = int(sys.argv[1]) if len(sys.argv) > 1 else 4
 STYLE = sys.argv[2] if len(sys.argv) > 2 else "clasico"   # "clasico" | "color"
 SUFFIX = "" if STYLE == "clasico" else "_color"
 S = 1 / F                                     # escala de todo lo dibujado
+# Versión alternativa (VARIANT=alt): mismos datos y rótulos, con retoques de acabado:
+# túneles en discontinuo, halos de texto más finos y nítidos y marco graduado cada 5′.
+ALT = os.environ.get("VARIANT", "") == "alt"
+OUTSUF = SUFFIX + ("_alt" if ALT else "")
+HALO_K, HALO_BLUR, HALO_OP = (0.72, 2.6, 0.86) if ALT else (1.0, 5.0, 0.80)
 
 relief = Image.open(f"work/relief{SUFFIX}_f{F}.png").convert("RGB")
 MW, MH = relief.size
@@ -51,7 +56,8 @@ DRAW_PARKS = False
 PARK_GEO = pickle.load(open("work/parks.pkl", "rb")) if DRAW_PARKS and os.path.exists("work/parks.pkl") else {}
 if DRAW_PARKS:
     linework.draw_parks(canvas, OX, OY, F, MW, MH, PARK_GEO, {p[1]: p[2] for p in PARKS}, sea_mask=sea_mask)
-river_geo = linework.draw_all(canvas, OX, OY, F, MW, MH, sea_mask=sea_mask)
+TUNNELS = pickle.load(open("work/tunnels.pkl", "rb")) if ALT and os.path.exists("work/tunnels.pkl") else None
+river_geo = linework.draw_all(canvas, OX, OY, F, MW, MH, sea_mask=sea_mask, tunnels=TUNNELS)
 del sea_mask
 
 FD = "fonts/"
@@ -97,7 +103,7 @@ def put_text(x, y, txt, f, color, anchor="lm", tracking=0, halo_w=10, rotate=0, 
     ay = {"t": -b[1], "m": -(b[1] + b[3]) / 2, "b": -b[3]}[anchor[1]]
     if reg and not rotate:
         BOXES.append((x + ax, y + ay + b[1], x + ax + w, y + ay + b[3]))
-    hw = int(halo_w * S)
+    hw = int(halo_w * S * HALO_K)
     if rotate:
         pad = hw * 3 + 4
         tw, th = int(w + 2 * pad), int(b[3] + 2 * pad)
@@ -183,7 +189,7 @@ def _river_label(c, s_mid, txt, f, color, gap, tracking, halo_w, span, dry=False
     ss = np.r_[0, np.cumsum(np.hypot(*np.diff(P, axis=0).T))]
     smid = np.interp(u0, uu, ss)
     pos = smid - L / 2
-    hw = int(halo_w * S)
+    hw = int(halo_w * S * HALO_K)
     if dry:                                   # solo las cajas de cada letra, sin dibujar
         out = []
         for ch, a_ in zip(txt, adv):
@@ -260,7 +266,7 @@ def place_block(cands, lines, halo_w=10, strict=False):
     cy = by
     for (t, f, c, tr), w, (m0, m1), hh in zip(lines, ws, mets, hs):
         lx = {"l": bx, "m": bx + (BW - w) / 2, "r": bx + BW - w}[anc[0]]
-        _draw_run(layer(c), hd, lx - (f.getbbox(t)[0] if tr == 0 else 0), cy - m0, t, f, tr, int(halo_w * S))
+        _draw_run(layer(c), hd, lx - (f.getbbox(t)[0] if tr == 0 else 0), cy - m0, t, f, tr, int(halo_w * S * HALO_K))
         cy += hh + gap
     BOXES.append(box)
     return ov
@@ -695,7 +701,7 @@ print("  monumentos automáticos nuevos:", n_m, "de", len(AUTO.get("pois", [])))
 _json.dump(POI_PLACED, open(f"work/pois_placed{SUFFIX}_f{F}.json", "w"), ensure_ascii=False, indent=0)
 
 # ---------------- gratícula en el marco
-def edge_crossings():
+def edge_crossings(step_lon=0.5, step_lat=0.25):
     """Cruces de meridianos (bordes sup/inf) y paralelos (bordes izq/der)."""
     out = []
     inv = lambda c, r: tx(src.crs, "EPSG:4326", *src.xy(r * SX, c * SX))
@@ -712,7 +718,7 @@ def edge_crossings():
         xs, ys = rasterio.transform.xy(src.transform, rows, cols, offset="ul")
         lon, lat = tx(src.crs, "EPSG:4326", xs, ys)
         v = np.array(lon if side in ("top", "bottom") else lat)
-        step = 0.5 if side in ("top", "bottom") else 0.25
+        step = step_lon if side in ("top", "bottom") else step_lat
         k = np.floor(v / step)
         for i in np.nonzero(np.diff(k))[0]:
             val = (max(k[i], k[i + 1])) * step
@@ -862,8 +868,8 @@ for k, (t, fname) in enumerate(cred):
     put_text(RX, SB_Y - 40 * S + 70 * k * S, t, font(fname, 42, 440), INK_SOFT, "rb", halo_w=0)
 
 # ---------------- componer halos y tintas
-halo_b = halo.filter(ImageFilter.GaussianBlur(max(1, 5 * S)))
-halo_b = halo_b.point(lambda v: int(min(255, v * 0.80)))
+halo_b = halo.filter(ImageFilter.GaussianBlur(max(1, HALO_BLUR * S)))
+halo_b = halo_b.point(lambda v: int(min(255, v * HALO_OP)))
 canvas.paste(Image.new("RGB", (CW, CH), PAPER), (0, 0), halo_b)
 del halo, halo_b
 
@@ -873,6 +879,30 @@ lw = max(1, int(5 * S))
 draw.rectangle(FR, outline=INK, width=lw)
 draw.rectangle((FR[0] - int(26 * S), FR[1] - int(26 * S), FR[2] + int(26 * S), FR[3] + int(26 * S)),
                outline=INK_SOFT, width=max(1, int(2 * S)))
+if ALT:
+    # marco graduado de grabado: banda de 5′ en 5′ alternando tinta y papel junto al filete
+    b0, b1 = 14 * S, 26 * S                   # entre un filete fino y el filete exterior
+    by_side = {}
+    for side, p, val in edge_crossings(1 / 12, 1 / 12):
+        by_side.setdefault(side, []).append((p, val))
+    for side, lst in by_side.items():
+        lst.sort()
+        L_ = MW if side in ("top", "bottom") else MH
+        cuts = [0.0] + [p for p, _ in lst] + [float(L_)]
+        k0 = int(round(lst[0][1] * 12)) if lst else 0
+        for i in range(len(cuts) - 1):
+            if (k0 + i) % 2: continue
+            a_, b_ = cuts[i], cuts[i + 1]
+            if side == "top":
+                draw.rectangle((OX + a_, OY - b1, OX + b_, OY - b0), fill=INK)
+            elif side == "bottom":
+                draw.rectangle((OX + a_, OY + MH + b0, OX + b_, OY + MH + b1), fill=INK)
+            elif side == "left":
+                draw.rectangle((OX - b1, OY + a_, OX - b0, OY + b_), fill=INK)
+            else:
+                draw.rectangle((OX + MW + b0, OY + a_, OX + MW + b1, OY + b_), fill=INK)
+    draw.rectangle((OX - b0, OY - b0, OX + MW + b0, OY + MH + b0), outline=INK, width=max(1, int(2 * S)))
+    draw.rectangle((OX - b1, OY - b1, OX + MW + b1, OY + MH + b1), outline=INK, width=max(1, int(2 * S)))
 for a, b in grat:
     draw.line([a, b], fill=INK, width=max(1, int(3 * S)))
 for x, y0 in exit_marks:                       # flecha: trazo fino y punta llena hacia fuera del mapa
@@ -1021,10 +1051,10 @@ for color, (im, _) in layers.items():
 os.makedirs("output", exist_ok=True)
 if F == 1:
     dpi = MW / (140 / 2.54)
-    canvas.save(f"output/pirineo{SUFFIX}_150cm.tif", dpi=(dpi, dpi), compression="tiff_lzw")
-    canvas.save(f"output/pirineo{SUFFIX}_150cm.png", dpi=(dpi, dpi))
-    canvas.resize((CW // 4, CH // 4), Image.LANCZOS).save(f"output/pirineo{SUFFIX}_preview.jpg", quality=90)
+    canvas.save(f"output/pirineo{OUTSUF}_150cm.tif", dpi=(dpi, dpi), compression="tiff_lzw")
+    canvas.save(f"output/pirineo{OUTSUF}_150cm.png", dpi=(dpi, dpi))
+    canvas.resize((CW // 4, CH // 4), Image.LANCZOS).save(f"output/pirineo{OUTSUF}_preview.jpg", quality=90)
     print(f"lámina {CW}x{CH} px · {CW / dpi * 2.54:.1f} x {CH / dpi * 2.54:.1f} cm a {dpi:.0f} ppp")
 else:
-    canvas.save(f"work/compose{SUFFIX}_f{F}.png")
+    canvas.save(f"work/compose{OUTSUF}_f{F}.png")
     print("vista previa", CW, CH)

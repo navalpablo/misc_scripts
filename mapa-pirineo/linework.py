@@ -109,7 +109,7 @@ def draw_parks(canvas, OX, OY, F, MW, MH, parks, kinds, sea_mask=None):
         del fill, edge, line, band, lin
 
 
-def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
+def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None, tunnels=None):
     S = 1 / F
     K = 2                     # supermuestreo
     sc = S * K
@@ -139,6 +139,28 @@ def draw_all(canvas, OX, OY, F, MW, MH, sea_mask=None):
             poly_line(d, np.asarray(ln.coords), w)
         composite(m, col, op)
         del m
+
+    # ---------- túneles (solo si se piden): mismo color, trazo discontinuo más fino
+    if tunnels:
+        for key, col, w, op in (("secondary", ROAD_SECONDARY, 2.0, 0.40),
+                                ("primary", ROAD_PRIMARY, 3.0, 0.68),
+                                ("major", ROAD_MAJOR, 4.4, 0.80)):
+            m = new_mask(); d = ImageDraw.Draw(m)
+            for ln in tunnels.get(key, []):
+                c = densify(np.asarray(ln.coords), 2.0)
+                if len(c) < 2: continue
+                seg = np.r_[0, np.cumsum(np.hypot(*np.diff(c, axis=0).T))]
+                on = (seg % 30) < 17                    # 17 px de trazo, 13 de hueco
+                run = []
+                for p, o in zip(c, on):
+                    if o:
+                        run.append(p)
+                    elif run:
+                        if len(run) > 1: poly_line(d, np.array(run), w * 0.75)
+                        run = []
+                if len(run) > 1: poly_line(d, np.array(run), w * 0.75)
+            composite(m, col, op * 0.85)
+            del m
 
     # ---------- frontera: cinta suave + línea de trazo y punto
     m = new_mask(); d = ImageDraw.Draw(m)
