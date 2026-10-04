@@ -179,18 +179,18 @@ main { position: relative; min-height: 0; background: var(--stage); }
 <script>
 (() => {
   // ---- configuración: teselas y archivos de descarga (los genera 11_descargas.py)
-  const TILES = { color: "color7", clasico: "clasico7" };
+  const TILES = { color: "color8", clasico: "clasico8" };
   const DL_DIR = "descargas/";
+  // FILES-BEGIN (lo reescribe 11_descargas.py)
   const FILES = {
-    color: { name: "pirineos_color", size: 54087475, w: 17731, h: 8286, dpi: 301,
-      parts: ["pirineos_color_150x70cm.parte1.jpg", "pirineos_color_150x70cm.parte2.jpg",
-              "pirineos_color_150x70cm.parte3.jpg", "pirineos_color_150x70cm.parte4.jpg"],
-      screen: "pirineos_color_pantalla.jpg", screenSize: 7852612, sw: 7680, sh: 3589 },
-    clasico: { name: "pirineos_clasica", size: 51929984, w: 17731, h: 8286, dpi: 301,
-      parts: ["pirineos_clasica_150x70cm.parte1.jpg", "pirineos_clasica_150x70cm.parte2.jpg",
-              "pirineos_clasica_150x70cm.parte3.jpg", "pirineos_clasica_150x70cm.parte4.jpg"],
-      screen: "pirineos_clasica_pantalla.jpg", screenSize: 7926203, sw: 7680, sh: 3589 }
+    color: { name: "pirineos_color", size: 54138072, w: 17731, h: 8286, dpi: 301,
+      parts: ["pirineos_color_150x70cm.parte1.jpg", "pirineos_color_150x70cm.parte2.jpg", "pirineos_color_150x70cm.parte3.jpg", "pirineos_color_150x70cm.parte4.jpg"],
+      screen: "pirineos_color_pantalla.jpg", screenSize: 7864660, sw: 7680, sh: 3589 },
+    clasico: { name: "pirineos_clasica", size: 51984367, w: 17731, h: 8286, dpi: 301,
+      parts: ["pirineos_clasica_150x70cm.parte1.jpg", "pirineos_clasica_150x70cm.parte2.jpg", "pirineos_clasica_150x70cm.parte3.jpg", "pirineos_clasica_150x70cm.parte4.jpg"],
+      screen: "pirineos_clasica_pantalla.jpg", screenSize: 7938309, sw: 7680, sh: 3589 }
   };
+  // FILES-END
 
   const W = 17731, H = 8286;            // píxeles de la lámina (301 ppp)
   const SHEET_CM = 149.6;               // ancho de la lámina impresa
@@ -318,7 +318,7 @@ main { position: relative; min-height: 0; background: var(--stage); }
   async function fetchParts(names, total, onProgress) {
     const blobs = []; let got = 0;
     for (const n of names) {
-      const r = await fetch(DL_DIR + n);
+      const r = await fetch(DL_DIR + n, { cache: "no-store" });   // los trozos se sustituyen al actualizar
       if (!r.ok) throw { code: "fetch", message: "HTTP " + r.status };
       if (r.body && r.body.getReader) {
         const reader = r.body.getReader(); const chunks = [];

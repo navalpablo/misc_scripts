@@ -118,6 +118,37 @@ TOWNS = [
     ("Navarrenx",            -0.7594, 43.3217, "r",   1042),
 ]
 
+# Localidades principales de la costa, a mano. Solo apartan a los municipios automáticos a menos de 3 km
+# (los de TOWNS apartan a 12 km), para no quitar los que ya había alrededor.
+TOWNS_COSTA = [
+    # localidades principales de la costa que la separación mínima entre rótulos dejaba fuera
+    # (población de Wikidata; Empuriabrava y L'Estartit, de OpenStreetMap)
+    ("Roses",                 3.1750, 42.2633, "b",  20365),
+    ("Empuriabrava",          3.1207, 42.2470, "b",   7925),
+    ("L'Estartit",            3.1985, 42.0530, "r",   3177),
+    ("Banyoles",              2.7664, 42.1194, "r",  20865),
+    ("Argelès-sur-Mer",       3.0239, 42.5461, "r",  10616),
+    ("Canet-en-Roussillon",   3.0072, 42.7056, "r",  13227),
+    ("Biarritz",             -1.5572, 43.4806, "l",  26206),
+    ("Saint-Jean-de-Luz",    -1.6597, 43.3903, "t",  14857),
+    ("Hendaye",              -1.7744, 43.3586, "br", 18102),
+    ("Hondarribia",          -1.7915, 43.3624, "tl", 16788),
+    ("Irun",                 -1.7888, 43.3378, "b",  63835),
+]
+
+# Otras localidades grandes que entran solo si caben sin pisar nada (antes que los municipios automáticos)
+TOWNS_OPT = [
+    ("Anglet",               -1.5194, 43.4842, "r",  43271),
+    ("Saint-Cyprien",         3.0064, 42.6181, "r",  12068),
+    ("Castelló d'Empúries",   3.0747, 42.2582, "t",  12201),
+    ("Torroella de Montgrí",  3.1286, 42.0439, "l",  12570),
+    ("Encamp",                1.5828, 42.5361, "r",  12826),
+    ("la Massana",            1.5164, 42.5442, "l",  11591),
+    ("Sant Julià de Lòria",   1.4900, 42.4700, "l",   9915),
+    ("Bidart",               -1.5931, 43.4369, "l",   7689),
+    ("Hasparren",            -1.3047, 43.3844, "r",   7626),
+]
+
 # Monumentos y lugares de interés cultural: nombre, lon, lat, posición preferida[, tamaño 2 = pequeño]
 # (coordenadas de Wikidata u OpenStreetMap). Repartidos por todas las regiones del mapa.
 POIS = [
@@ -204,6 +235,32 @@ POIS_WD = [
     ("Sant Serni de Tavèrnoles", 1.4581, 42.3828, "r", 2),
     ("Château de Ruthie", -0.9341, 43.1498, "r", 2),
     ("Sant Pere del Burgal", 1.1673, 42.5460, "r", 2),
+    # añadidos en la selección ampliada (4-oct-2026) y fijados también
+    ("Château de Termes", 2.5567, 43.0022, "r", 2),
+    ("Caune de l'Arago", 2.7550, 42.8394, "r", 2),
+    ("Monasterio de San Pedro de Siresa", -0.7547, 42.7553, "r", 2),
+    ("Castell de Peralada", 3.0108, 42.3076, "r", 2),
+    ("Château de Roquefixade", 1.7533, 42.9389, "r", 2),
+    ("Pech Maho", 2.9562, 43.0457, "r", 2),
+    ("Saint-Girons de Monein", -0.5794, 43.3224, "r", 2),
+    ("Saint-André de Sorède", 2.9713, 42.5525, "r", 2),
+    ("Abbaye de Saint-Papoul", 2.0338, 43.3309, "r", 2),
+    ("Château de Montaillou", 1.8942, 42.7870, "r", 2),
+    ("Château d'Aubiry", 2.7661, 42.5129, "r", 2),
+    ("Abbaye de Boulbonne", 1.5563, 43.3058, "r", 2),
+    ("Abbaye de Bonnefont", 0.8742, 43.1411, "r", 2),
+    ("Château de Saint-Paul-d'Oueil", 0.5511, 42.8269, "r", 2),
+    ("Abbaye Notre-Dame de Belloc", -1.2617, 43.4488, "r", 2),
+    ("Castillo de Falcés", 0.5598, 42.1002, "r", 2),
+    ("Castillo de Mirapeix", -1.5271, 42.1244, "r", 2),
+    ("Castillo de Irulegui", -1.5135, 42.7796, "r", 2),
+    ("Graccurris", -1.7411, 42.1800, "r", 2),
+    ("Sant Pere de Graudescales", 1.6892, 42.1022, "r", 2),
+    ("Château de Castelnou", 2.7028, 42.6189, "r", 2),
+    ("Sant Esteve d'en Bas", 2.4590, 42.1185, "r", 2),
+    ("Château de Françon", -1.5599, 43.4620, "r", 2),
+    ("Château de Miramont", 2.5004, 43.1710, "r", 2),
+    ("El Salvador de Agüero", -0.7947, 42.3551, "r", 2),
 ]
 
 # Puertos de montaña (signo «)(», nombre y altitud; collados de OpenStreetMap): nombre, altitud, lon, lat,

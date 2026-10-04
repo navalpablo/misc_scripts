@@ -13,7 +13,7 @@ import numpy as np
 import rasterio
 from rasterio.warp import transform as tx
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-from places import PEAKS, TOWNS, AREAS, RIVERS, RESERVOIRS, VALLEYS, POIS, POIS_WD, NATURAL, PARKS, PASSES, EXITS
+from places import PEAKS, TOWNS, TOWNS_COSTA, TOWNS_OPT, AREAS, RIVERS, RESERVOIRS, VALLEYS, POIS, POIS_WD, NATURAL, PARKS, PASSES, EXITS
 import pickle, math
 import re
 import linework
@@ -304,7 +304,7 @@ def pop_t(pop):
 def muni_radius(pop):
     return 7.5 + 10.5 * pop_t(pop)            # px a resolución completa
 town_pts = []
-for name, lon, lat, pos, pop in TOWNS:
+for name, lon, lat, pos, pop in TOWNS + TOWNS_COSTA:
     x, y = ll2px(lon, lat)
     town_pts.append((name, x + OX, y + OY, pos, pop))
 for name, h, x, y, pos in peak_pts:
@@ -639,6 +639,14 @@ def fixed_poi(name, lon, lat, pos):
     print("  aviso: monumento fijado con solape", name, int(ov))
 for name, lon, lat, pos, stage in POIS_WD:
     if stage == 1: fixed_poi(name, lon, lat, pos)
+
+# ---- localidades grandes opcionales (places.TOWNS_OPT): solo si caben sin pisar nada
+for name, lon, lat, pos, pop in TOWNS_OPT:
+    x, y = ll2px(lon, lat); x += OX; y += OY
+    tt = pop_t(pop); rad = muni_radius(pop)
+    fm = font(EB, 42 + 18 * tt, int(460 + 120 * tt))
+    ok = try_symbol_label("muni", x, y, rad, point_cands(x, y, pos, (rad + 16) * S), [(name, fm, INK, 0)], 8 + 3 * tt)
+    print("  localidad opcional:", name, "sí" if ok else "no cabe")
 
 # ---- municipios (por relevancia)
 n_t = 0

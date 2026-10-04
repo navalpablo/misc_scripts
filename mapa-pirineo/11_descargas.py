@@ -41,3 +41,15 @@ for key, src, base in (("color", "output/pirineo_color_150cm.png", "pirineos_col
                          screen_width=w2, screen_height=round(H * w2 / W))
     print(key, f"{len(data) / 1e6:.1f} MB en {len(parts)} trozos; pantalla {os.path.getsize(scr) / 1e6:.1f} MB")
 json.dump(manifest, open(f"{OUT}/descargas.json", "w"), indent=1)
+
+# el visor lleva la lista de archivos y tamaños escrita dentro
+import re
+js = "  const FILES = {\n" + ",\n".join(
+    f'    {k}: {{ name: "{m["full"].replace("_150x70cm.jpg", "")}", size: {m["size"]}, w: {m["width"]}, h: {m["height"]}, '
+    f'dpi: {m["dpi"]},\n      parts: {json.dumps(m["parts"])},\n'
+    f'      screen: "{m["screen"]}", screenSize: {m["screen_size"]}, sw: {m["screen_width"]}, sh: {m["screen_height"]} }}'
+    for k, m in manifest.items()) + "\n  };"
+v = open("web/visor.html").read()
+v = re.sub(r"(// FILES-BEGIN[^\n]*\n).*?(\n\s*// FILES-END)", lambda mm: mm.group(1) + js + mm.group(2), v, flags=re.S)
+open("web/visor.html", "w").write(v)
+print("visor actualizado con", list(manifest))

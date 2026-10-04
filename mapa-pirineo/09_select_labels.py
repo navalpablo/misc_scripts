@@ -26,7 +26,7 @@ from rasterio.enums import Resampling
 from rasterio.warp import transform as tx
 from scipy import ndimage as nd
 import mapbox_vector_tile as mvt
-from places import TOWNS, POIS, POIS_WD, PEAKS, VALLEYS, AREAS
+from places import TOWNS, TOWNS_COSTA, TOWNS_OPT, POIS, POIS_WD, PEAKS, VALLEYS, AREAS
 
 D_TOWN, D_POI, D_VALLEY, D_PEAK = 12e3, 9e3, 15e3, 16e3      # metros
 MIN_POP, MIN_POI_SL, MIN_VALLEY_SL = 150, 5, 4
@@ -108,11 +108,12 @@ for r in rows:
     r["name"] = town_name(r) if (r["es"] or r["fr"] or r["ca"]) else None
 
 town_seed = xy_list([(t[1], t[2]) for t in TOWNS])
+near_xy = xy_list([(t[1], t[2]) for t in TOWNS_COSTA + TOWNS_OPT])   # solo apartan a 3 km
 cand = [r for r in rows if r["pop"] >= MIN_POP and r["name"] and inside(r["lon"], r["lat"])
-        and far_from(town_seed, r["lon"], r["lat"], 3000)]
+        and far_from(town_seed, r["lon"], r["lat"], 3000) and far_from(near_xy, r["lon"], r["lat"], 3000)]
 towns = greedy(cand, town_seed, D_TOWN, key=lambda r: -r["score"])
 print("municipios añadidos:", len(towns))
-all_town_xy = town_seed + xy_list([(t["lon"], t["lat"]) for t in towns])
+all_town_xy = town_seed + near_xy + xy_list([(t["lon"], t["lat"]) for t in towns])
 
 def nearest_region(lon, lat):
     best = min(rows, key=lambda r: (r["lon"] - lon) ** 2 + ((r["lat"] - lat) * 1.35) ** 2)
