@@ -234,10 +234,9 @@ PASSES = [
 
 # Salidas por el borde del mapa hacia lugares de fuera: rótulo (líneas), lon, lat de un punto de la
 # carretera dentro del mapa cerca del borde, referencia de la carretera (OSM)
-EXITS = [
-    (("a Villanueva de Gállego", "y Peñaflor de Gállego"), -0.6243, 42.0121, "A-23"),
-    (("a Sant Cugat del Vallès",), 0.0612, 42.0181, "A-22"),
-]
+# (vacío: se probaron flechas hacia Villanueva y Peñaflor de Gállego por la A-23 y hacia Sant Cugat
+#  por la A-22, pero la lámina queda más limpia sin ellas)
+EXITS = []
 
 # Embalses y lagunas con nombre: rótulo, lon, lat (punto dentro o junto a la lámina de agua OSM)
 RESERVOIRS = [
