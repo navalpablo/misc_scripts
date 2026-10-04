@@ -29,6 +29,14 @@ ALT = os.environ.get("VARIANT", "") == "alt"
 OUTSUF = SUFFIX + ("_alt" if ALT else "")
 HALO_K, HALO_BLUR, HALO_OP = (0.72, 2.6, 0.86) if ALT else (1.0, 5.0, 0.80)
 
+def polish(n):
+    """(Versión alternativa) nombres de monumentos más cortos y coherentes entre sí."""
+    n = re.sub(r"^(Iglesia|Església|Église) (de |d')?(?=(San|Santa|Sant|Santo|Saint|Sainte)\b)", "", n)
+    return n.replace("Conjunto megalítico Eteneta I", "Conjunto megalítico de Eteneta")
+if ALT:
+    POIS = [(polish(p[0]),) + tuple(p[1:]) for p in POIS]
+    POIS_WD = [(polish(p[0]),) + tuple(p[1:]) for p in POIS_WD]
+
 relief = Image.open(f"work/relief{SUFFIX}_f{F}.png").convert("RGB")
 MW, MH = relief.size
 src = rasterio.open("work/dem_lcc.tif")
@@ -552,6 +560,8 @@ for label, pat, kind, lon, lat in (PARKS if DRAW_PARKS else []):
 # Se colocan después de todo lo elegido a mano y SOLO si caben sin pisar nada; si no, se descartan.
 import json as _json
 AUTO = _json.load(open("work/auto_labels.json")) if os.path.exists("work/auto_labels.json") else {}
+if ALT:
+    for p_ in AUTO.get("pois", []): p_["name"] = polish(p_["name"])
 
 def try_symbol_label(kind, x, y, rad, cands, lines, halo_w):
     rr = (rad + 2) * S
@@ -827,8 +837,11 @@ key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"), ("poi
              ("river", "Río"), ("border", "Frontera"),
              ("major", "Autopista · autovía"), ("primary", "Carretera principal"), ("secondary", "Carretera secundaria")]
 key_lines = []
+# en la alternativa, la leyenda se agrupa por temas: relieve y lugares | agua y límites | carreteras
+ALT_ORDER = [["peak", "pass", "muni", "poi"], ["natlabel", "river", "border"], ["major", "primary", "secondary"]]
+ALT_POS = {kind: (c, r) for c, kinds in enumerate(ALT_ORDER) for r, kind in enumerate(kinds)}
 for k, (kind, label) in enumerate(key_items):
-    col, row = divmod(k, 4)
+    col, row = ALT_POS[kind] if ALT and kind in ALT_POS else divmod(k, 4)
     x = KX + col * 860 * S; y = KY + row * ROW + 30 * S
     if kind == "peak":
         symbols.append(("peak", x + 45 * S, y, 18))

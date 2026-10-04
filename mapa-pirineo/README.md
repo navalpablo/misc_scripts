@@ -58,7 +58,7 @@ En `08_color_base.py` se ajustan los colores por cobertura, el peso del satélit
   el código exacto con el que se generó. `./run_all.sh` sin más opciones la reproduce.
 - **Versión alternativa** (`VARIANT=alt python3 03_compose.py 1 color`, tras `python3 04c_osm_tunnels.py`):
   mismos datos y rótulos, con retoques de acabado. Los túneles de carretera van en discontinuo en vez de
-  cortar la carretera. Los halos de los rótulos son más finos y nítidos. El marco va graduado de 5′ en 5′.
+  cortar la carretera. Los halos de los rótulos son más finos y nítidos. El marco va graduado de 5′ en 5′. La leyenda se agrupa por temas y los nombres de iglesias se abrevian («San Martín de Oliván»).
   Sale como `output/pirineo_color_alt_150cm.*` y no toca la versión buena.
 
 ## Imprimir
