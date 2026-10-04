@@ -52,14 +52,27 @@ F=4 ./run_all.sh             # vistas previas rápidas a 1/4 (work/compose*_f4.p
 Toponimia en `places.py`: cimas, municipios (con su población, de OpenStreetMap: el punto y el nombre crecen con ella en escala logarítmica), monumentos y lugares de interés cultural (y alguno personal, como La Huerta), embalses, valles (rotulados a lo largo de su río o de su eje), parajes naturales (cursiva verde), puertos de montaña (Monrepós y Somport siempre; el resto solo si caben). Los monumentos ya elegidos quedan fijados en `POIS_WD`; los nuevos de Wikidata solo entran donde quepan sin pisar nada. Los rótulos se colocan solos en la primera de ocho posiciones alrededor del punto que no pise otro rótulo o símbolo; la posición indicada en `places.py` es solo la preferida. Lo elegido a mano en `places.py` se coloca primero; lo automático solo entra si cabe sin pisar nada.
 En `08_color_base.py` se ajustan los colores por cobertura, el peso del satélite y la cota de nieve.
 
-## Versión buena y alternativa
+## Versión definitiva
 
-- **Versión buena** (la de referencia para imprimir): la rama `pirineo-definitiva` de este repositorio guarda
-  el código exacto con el que se generó. `./run_all.sh` sin más opciones la reproduce.
-- **Versión alternativa** (`VARIANT=alt python3 03_compose.py 1 color`, tras `python3 04c_osm_tunnels.py`):
-  mismos datos y rótulos, con retoques de acabado. Los túneles de carretera van en discontinuo en vez de
-  cortar la carretera. Los halos de los rótulos son más finos y nítidos. El marco va graduado de 5′ en 5′. La leyenda se agrupa por temas y los nombres de iglesias se abrevian («San Martín de Oliván»).
-  Sale como `output/pirineo_color_alt_150cm.*` y no toca la versión buena.
+La lámina definitiva (4 de octubre de 2026) lleva un acabado de grabado: túneles de carretera en discontinuo
+(`04c_osm_tunnels.py`), halos de rótulos finos y nítidos, marco graduado de 5′ en 5′, leyenda agrupada por temas
+y nombres de iglesias abreviados («San Martín de Oliván»). `./run_all.sh` la reproduce tal cual.
+La rama `pirineo-definitiva` guarda el código exacto. La primera versión definitiva, sin esos retoques,
+está en la rama `pirineo-definitiva-v1`, y también se obtiene con `VARIANT=v1 python3 03_compose.py 1 color`.
+
+## Descargas desde el visor
+
+`python3 11_descargas.py` prepara en `output/descargas/` los archivos que ofrece el botón «Descargar» del visor:
+
+| Formato | Para qué |
+|---|---|
+| JPEG de máxima calidad, 17.731 × 8.286 px a 301 ppp (calidad 95, sin submuestreo de color, ~54 MB) | Imprimir a 150 × 70 cm o guardar |
+| PDF de imprenta de 150 × 70 cm | Lo que suelen pedir las imprentas; el visor lo genera al vuelo envolviendo el mismo JPEG, sin recomprimir |
+| JPEG de pantalla de 7.680 px (~8 MB) | Verla en el ordenador o la tele y compartirla |
+
+El JPEG grande se publica en trozos de 14 MiB porque el visor de claude.ai solo sirve archivos de hasta 15 MB;
+el navegador los descarga y los une. `web/visor.html` es el visor; la versión de GitHub Pages es la misma página
+con su cabecera HTML completa.
 
 ## Imprimir
 

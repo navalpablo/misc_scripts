@@ -23,14 +23,16 @@ F = int(sys.argv[1]) if len(sys.argv) > 1 else 4
 STYLE = sys.argv[2] if len(sys.argv) > 2 else "clasico"   # "clasico" | "color"
 SUFFIX = "" if STYLE == "clasico" else "_color"
 S = 1 / F                                     # escala de todo lo dibujado
-# Versión alternativa (VARIANT=alt): mismos datos y rótulos, con retoques de acabado:
-# túneles en discontinuo, halos de texto más finos y nítidos y marco graduado cada 5′.
-ALT = os.environ.get("VARIANT", "") == "alt"
-OUTSUF = SUFFIX + ("_alt" if ALT else "")
+# Acabado (4-oct-2026, elegido como definitivo): túneles en discontinuo, halos de texto finos y nítidos,
+# marco graduado cada 5′, leyenda agrupada por temas y nombres de iglesias abreviados.
+# VARIANT=v1 reproduce el acabado de la primera versión definitiva (sin esos retoques) en *_v1_*.
+VARIANT = os.environ.get("VARIANT", "")
+ALT = VARIANT != "v1"
+OUTSUF = SUFFIX + ("_v1" if VARIANT == "v1" else "")
 HALO_K, HALO_BLUR, HALO_OP = (0.72, 2.6, 0.86) if ALT else (1.0, 5.0, 0.80)
 
 def polish(n):
-    """(Versión alternativa) nombres de monumentos más cortos y coherentes entre sí."""
+    """Nombres de monumentos más cortos y coherentes entre sí."""
     n = re.sub(r"^(Iglesia|Església|Église) (de |d')?(?=(San|Santa|Sant|Santo|Saint|Sainte)\b)", "", n)
     return n.replace("Conjunto megalítico Eteneta I", "Conjunto megalítico de Eteneta")
 if ALT:
@@ -837,7 +839,7 @@ key_items = [("peak", "Cima · altitud en metros"), ("muni", "Municipio"), ("poi
              ("river", "Río"), ("border", "Frontera"),
              ("major", "Autopista · autovía"), ("primary", "Carretera principal"), ("secondary", "Carretera secundaria")]
 key_lines = []
-# en la alternativa, la leyenda se agrupa por temas: relieve y lugares | agua y límites | carreteras
+# leyenda agrupada por temas: relieve y lugares | agua y límites | carreteras
 ALT_ORDER = [["peak", "pass", "muni", "poi"], ["natlabel", "river", "border"], ["major", "primary", "secondary"]]
 ALT_POS = {kind: (c, r) for c, kinds in enumerate(ALT_ORDER) for r, kind in enumerate(kinds)}
 for k, (kind, label) in enumerate(key_items):
