@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Pirineos en relieve</title>
-<meta name="description" content="Mapa de relieve de los Pirineos a resolución completa: del golfo de Bizkaia al cabo de Creus.">
+<meta name="description" content="Mapa de relieve de los Pirineos a resolución completa, del golfo de Bizkaia al cabo de Creus, con descargas para imprimir a 150 × 70 cm.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap">
 <style>
-/* Una sola pantalla: barra de lámina arriba, visor a sangre debajo. Paleta tomada del propio mapa:
-   papel, tinta y el azul de los ríos. */
+/* Una sola pantalla: barra de lámina arriba, visor a sangre debajo, y un panel de descarga que se
+   despliega sobre el mapa. Paleta tomada del propio mapa: papel, tinta y el azul de los ríos. */
 :root {
   --paper: #f4f0e6;
   --ink: #3a342e;
@@ -19,24 +19,25 @@
   --rule: #d9d1c2;
   --stage: #ebe6da;
   --chip: #fbf8f1;
+  --shadow: rgba(58, 52, 46, 0.18);
   --font-display: "Cormorant Garamond", "Iowan Old Style", Georgia, serif;
   --font-body: "EB Garamond", "Iowan Old Style", Georgia, serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --paper: #1c2023; --ink: #ece6da; --ink-soft: #a9a196; --river: #8fb7d2;
-    --rule: #343a3f; --stage: #121517; --chip: #262b2f; color-scheme: dark;
+    --rule: #343a3f; --stage: #121517; --chip: #262b2f; --shadow: rgba(0, 0, 0, 0.5); color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
   --paper: #1c2023; --ink: #ece6da; --ink-soft: #a9a196; --river: #8fb7d2;
-  --rule: #343a3f; --stage: #121517; --chip: #262b2f; color-scheme: dark;
+  --rule: #343a3f; --stage: #121517; --chip: #262b2f; --shadow: rgba(0, 0, 0, 0.5); color-scheme: dark;
 }
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--paper); color: var(--ink);
   font-family: var(--font-body); font-size: 16px;
-  display: grid; grid-template-rows: auto 1fr; overflow: hidden;
+  display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); overflow: hidden;
 }
 header {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
@@ -55,16 +56,18 @@ h1 {
   padding: 4px 14px; border-radius: 999px; cursor: pointer;
 }
 .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
-.tools { display: inline-flex; gap: 4px; }
+.tools { display: inline-flex; gap: 4px; flex-wrap: wrap; }
 .tools button {
   font: inherit; font-size: 0.95rem; min-width: 34px; height: 32px; padding: 0 10px;
   border: 1px solid var(--rule); background: var(--chip); color: var(--ink); border-radius: 6px; cursor: pointer;
+  white-space: nowrap;
 }
+.tools button.get { border-color: var(--river); color: var(--river); }
+.tools button.get[aria-expanded="true"] { background: var(--river); color: var(--paper); }
 .tools button:hover, .seg button:hover { color: var(--river); }
+.tools button.get[aria-expanded="true"]:hover { color: var(--paper); }
 button:focus-visible { outline: 2px solid var(--river); outline-offset: 2px; }
-.readout {
-  font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 0.92rem; white-space: nowrap;
-}
+.readout { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 0.92rem; white-space: nowrap; }
 .readout b { color: var(--ink); font-weight: 500; }
 main { position: relative; min-height: 0; background: var(--stage); }
 #osd { position: absolute; inset: 0; }
@@ -75,18 +78,51 @@ main { position: relative; min-height: 0; background: var(--stage); }
   transition: opacity .6s;
 }
 .hint.gone { opacity: 0; }
-.tools button { white-space: nowrap; }
-.dl { color: var(--river); font-size: 0.95rem; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+
+/* ---- panel de descarga */
+.panel {
+  position: absolute; top: 12px; right: 16px; z-index: 5; box-sizing: border-box;
+  width: min(430px, calc(100% - 32px)); max-height: calc(100% - 24px); overflow-y: auto;
+  background: var(--paper); color: var(--ink); border: 1px solid var(--rule); border-radius: 10px;
+  box-shadow: 0 10px 30px var(--shadow); padding: 18px 18px 14px;
+}
+.panel h2 { margin: 0; font-family: var(--font-display); font-weight: 500; font-size: 1.45rem; line-height: 1.1; }
+.panel .lead { margin: 4px 0 12px; color: var(--ink-soft); font-size: 0.95rem; font-style: italic; }
+.panel ul { list-style: none; margin: 0; padding: 0; display: grid; }
+.panel li {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 14px; align-items: center;
+  padding-block: 11px; border-top: 1px solid var(--rule);
+}
+.panel li > div { min-width: 0; }
+.fmt { font-weight: 500; font-size: 1.04rem; }
+.meta { font-variant-numeric: tabular-nums; color: var(--ink-soft); font-size: 0.9rem; }
+.use { font-size: 0.92rem; color: var(--ink); }
+.panel li button {
+  font: inherit; font-size: 0.95rem; height: 34px; padding: 0 14px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--river); background: var(--river); color: var(--paper); white-space: nowrap;
+}
+.panel li button:disabled { opacity: 0.5; cursor: progress; }
+.status { min-height: 1.3em; margin: 6px 0 0; font-size: 0.92rem; color: var(--river); font-variant-numeric: tabular-nums; }
+.note { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid var(--rule); color: var(--ink-soft); font-size: 0.85rem; line-height: 1.35; }
+.close {
+  position: absolute; top: 8px; right: 8px; width: 32px; height: 32px; border: 0; background: transparent;
+  color: var(--ink-soft); font: inherit; font-size: 1.3rem; cursor: pointer; border-radius: 6px;
+}
+.close:hover { color: var(--river); }
+
 @media (max-width: 620px) {
   h1 { font-size: 1.35rem; letter-spacing: 0.24em; }
   .sub, .readout .scale, #z-real, #z-full { display: none; }
   header { gap: 8px 12px; }
   .name { margin-right: 0; }
+  .panel li { grid-template-columns: 1fr; }
+  .panel li button { justify-self: start; }
 }
 @media (prefers-reduced-motion: reduce) { .hint { transition: none; } }
 </style>
 </head>
 <body>
+
 <header>
   <div class="name">
     <h1>Pirineos</h1>
@@ -103,19 +139,67 @@ main { position: relative; min-height: 0; background: var(--stage); }
       <button id="z-real" type="button" title="Escala aproximada de la lámina impresa">Tamaño real</button>
       <button id="z-home" type="button">Entera</button>
       <button id="z-full" type="button">Pantalla completa</button>
+      <button id="get" class="get" type="button" aria-expanded="false" aria-controls="panel">Descargar</button>
     </div>
-    <a class="dl" id="dl" href="pirineo_color_150cm.jpg" download>Descargar JPG (29 MB)</a>
     <span class="readout" aria-live="polite"><b id="cm">150</b> cm de lámina a la vista<span class="scale"> · 1:<span id="den">320.000</span> en pantalla</span></span>
   </div>
 </header>
 <main>
   <div id="osd" aria-label="Mapa de relieve de los Pirineos, ampliable"></div>
   <div class="hint" id="hint">Arrastra para moverte · rueda o pellizco para acercar</div>
+
+  <section class="panel" id="panel" hidden aria-labelledby="panel-title">
+    <button class="close" id="panel-close" type="button" aria-label="Cerrar">×</button>
+    <h2 id="panel-title">Descargar la lámina</h2>
+    <p class="lead">Versión <span id="ver">en color</span>. Cambia con el selector Color / Clásica.</p>
+    <ul>
+      <li>
+        <div>
+          <div class="fmt">Lámina completa · JPEG</div>
+          <div class="meta" id="m-jpg"></div>
+          <div class="use">Máxima calidad, para imprimir a 150 × 70 cm o guardar.</div>
+        </div>
+        <button type="button" id="d-jpg">Descargar</button>
+      </li>
+      <li>
+        <div>
+          <div class="fmt">PDF de imprenta</div>
+          <div class="meta" id="m-pdf"></div>
+          <div class="use">Página de 150 × 70 cm con la misma imagen, sin recomprimir. Es lo que suelen pedir las imprentas.</div>
+        </div>
+        <button type="button" id="d-pdf">Descargar</button>
+      </li>
+      <li>
+        <div>
+          <div class="fmt">Pantalla · JPEG</div>
+          <div class="meta" id="m-scr"></div>
+          <div class="use">Para verla en el ordenador o la tele, o para compartirla.</div>
+        </div>
+        <button type="button" id="d-scr">Descargar</button>
+      </li>
+    </ul>
+    <p class="status" id="status" aria-live="polite"></p>
+    <p class="note">El JPEG completo va a calidad 95 y sin submuestreo de color: a simple vista no se distingue del original sin pérdida, que pesa unos 165 MB. Las descargas grandes tardan un poco en prepararse, porque el navegador junta la lámina a partir de varios trozos.</p>
+  </section>
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/openseadragon/4.1.0/openseadragon.min.js"></script>
 <script>
 (() => {
+  // ---- configuración: teselas y archivos de descarga (los genera 11_descargas.py)
+  const TILES = { color: "color", clasico: "clasico" };
+  const DL_DIR = "descargas/";
+  const FILES = {
+    color: { name: "pirineos_color", size: 54087475, w: 17731, h: 8286, dpi: 301,
+      parts: ["pirineos_color_150x70cm.parte1.jpg", "pirineos_color_150x70cm.parte2.jpg",
+              "pirineos_color_150x70cm.parte3.jpg", "pirineos_color_150x70cm.parte4.jpg"],
+      screen: "pirineos_color_pantalla.jpg", screenSize: 7852612, sw: 7680, sh: 3589 },
+    clasico: { name: "pirineos_clasica", size: 51929984, w: 17731, h: 8286, dpi: 301,
+      parts: ["pirineos_clasica_150x70cm.parte1.jpg", "pirineos_clasica_150x70cm.parte2.jpg",
+              "pirineos_clasica_150x70cm.parte3.jpg", "pirineos_clasica_150x70cm.parte4.jpg"],
+      screen: "pirineos_clasica_pantalla.jpg", screenSize: 7926203, sw: 7680, sh: 3589 }
+  };
+
   const W = 17731, H = 8286;            // píxeles de la lámina (301 ppp)
   const SHEET_CM = 149.6;               // ancho de la lámina impresa
   const PRINT_DPI = 301, CSS_DPI = 96;  // tamaño real ≈ 96/301 px de pantalla por píxel de lámina
@@ -125,7 +209,7 @@ main { position: relative; min-height: 0; background: var(--stage); }
 
   const viewer = OpenSeadragon({
     id: "osd",
-    tileSources: [{ tileSource: src("color"), opacity: 1 }, { tileSource: src("clasico"), opacity: 0 }],
+    tileSources: [{ tileSource: src(TILES.color), opacity: 1 }, { tileSource: src(TILES.clasico), opacity: 0 }],
     showNavigationControl: false,
     showNavigator: true, navigatorPosition: "BOTTOM_RIGHT", navigatorSizeRatio: 0.16,
     navigatorBackground: "transparent", navigatorBorderColor: "transparent",
@@ -138,18 +222,19 @@ main { position: relative; min-height: 0; background: var(--stage); }
   });
 
   // ---- versión (Color / Clásica), con enlace directo #color o #clasico
+  let current = "color";
   const btnC = document.getElementById("v-color"), btnK = document.getElementById("v-clasico");
   function show(which) {
     const items = [viewer.world.getItemAt(0), viewer.world.getItemAt(1)];
     if (!items[1]) return;
     const k = which === "clasico";
+    current = k ? "clasico" : "color";
     items[1].setOpacity(k ? 1 : 0);
     items[0].setOpacity(k ? 0 : 1);
     btnC.setAttribute("aria-pressed", String(!k));
     btnK.setAttribute("aria-pressed", String(k));
-    const dl = document.getElementById("dl");
-    if (dl) dl.href = k ? "pirineo_150cm.jpg" : "pirineo_color_150cm.jpg";
-    try { history.replaceState(null, "", "#" + which); } catch (e) {}
+    try { history.replaceState(null, "", "#" + current); } catch (e) {}
+    fillPanel();
   }
   btnC.addEventListener("click", () => show("color"));
   btnK.addEventListener("click", () => show("clasico"));
@@ -165,8 +250,7 @@ main { position: relative; min-height: 0; background: var(--stage); }
   document.getElementById("z-home").addEventListener("click", () => vp().goHome());
   document.getElementById("z-real").addEventListener("click", () => {
     const item = viewer.world.getItemAt(0); if (!item) return;
-    const target = (CSS_DPI / PRINT_DPI) * (window.devicePixelRatio ? 1 : 1);
-    vp().zoomTo(item.imageToViewportZoom(target));
+    vp().zoomTo(item.imageToViewportZoom(CSS_DPI / PRINT_DPI));
   });
   document.getElementById("z-full").addEventListener("click", () => {
     try { viewer.setFullScreen(!viewer.isFullPage()); } catch (e) {}
@@ -177,12 +261,10 @@ main { position: relative; min-height: 0; background: var(--stage); }
   const cmEl = document.getElementById("cm"), denEl = document.getElementById("den");
   function readout() {
     const item = viewer.world.getItemAt(0); if (!item) return;
-    const b = vp().getBounds(true);
-    const r = item.viewportToImageRectangle(b);
+    const r = item.viewportToImageRectangle(vp().getBounds(true));
     const cm = Math.min(SHEET_CM, r.width / W * SHEET_CM);
     cmEl.textContent = cm >= 10 ? fmt.format(cm) : cm.toFixed(1).replace(".", ",");
-    const imgZoom = item.viewportToImageZoom(vp().getZoom(true));       // px de pantalla por px de lámina
-    const screenScale = imgZoom * PRINT_DPI / CSS_DPI;                    // 1 = tamaño impreso
+    const screenScale = item.viewportToImageZoom(vp().getZoom(true)) * PRINT_DPI / CSS_DPI;
     denEl.textContent = fmt.format(Math.round(MAP_SCALE / screenScale / 1000) * 1000);
   }
   viewer.addHandler("animation", readout);
@@ -196,7 +278,135 @@ main { position: relative; min-height: 0; background: var(--stage); }
   viewer.addHandler("canvas-scroll", hide);
   viewer.addHandler("canvas-pinch", hide);
   setTimeout(hide, 9000);
+
+  // ================= descargas =================
+  const panel = document.getElementById("panel"), getBtn = document.getElementById("get");
+  const statusEl = document.getElementById("status");
+  const mb = b => fmt.format(b / 1e6) + " MB";
+  const px = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const cm1 = v => v.toFixed(1).replace(".", ",");
+  function fillPanel() {
+    const f = FILES[current];
+    document.getElementById("ver").textContent = current === "color" ? "en color" : "clásica";
+    document.getElementById("m-jpg").textContent = `${px(f.w)} × ${px(f.h)} px · ${f.dpi} ppp · ${mb(f.size)}`;
+    document.getElementById("m-pdf").textContent = `${cm1(f.w / f.dpi * 2.54)} × ${cm1(f.h / f.dpi * 2.54)} cm · ${mb(f.size)}`;
+    document.getElementById("m-scr").textContent = `${px(f.sw)} × ${px(f.sh)} px · ${mb(f.screenSize)}`;
+  }
+  function setPanel(open) {
+    panel.hidden = !open;
+    getBtn.setAttribute("aria-expanded", String(open));
+    if (open) { fillPanel(); document.getElementById("d-jpg").focus(); }
+  }
+  getBtn.addEventListener("click", () => setPanel(panel.hidden));
+  document.getElementById("panel-close").addEventListener("click", () => { setPanel(false); getBtn.focus(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !panel.hidden) { setPanel(false); getBtn.focus(); } });
+
+  // Dentro de claude.ai la descarga pasa por la capacidad «downloads» (el visor pide confirmación);
+  // fuera (GitHub Pages) basta un enlace de descarga normal.
+  let capPromise = null;
+  function downloadsCap() {
+    if (!capPromise) {
+      capPromise = (window.claude && typeof window.claude.use === "function")
+        ? window.claude.use("downloads").catch(() => null) : Promise.resolve(null);
+    }
+    return capPromise;
+  }
+  downloadsCap();
+  async function saveBlob(filename, blob) {
+    const cap = await downloadsCap();
+    if (cap) { await cap.save({ filename, data: blob }); return; }
+    if (window.claude) throw { code: "unavailable" };
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  }
+
+  // Descarga los trozos publicados junto a la página y los une en un único JPEG
+  async function fetchParts(names, total, onProgress) {
+    const blobs = []; let got = 0;
+    for (const n of names) {
+      const r = await fetch(DL_DIR + n);
+      if (!r.ok) throw { code: "fetch", message: "HTTP " + r.status };
+      if (r.body && r.body.getReader) {
+        const reader = r.body.getReader(); const chunks = [];
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value); got += value.length; onProgress(got / total);
+        }
+        blobs.push(new Blob(chunks));
+      } else {
+        const b = await r.blob(); got += b.size; onProgress(got / total); blobs.push(b);
+      }
+    }
+    const out = new Blob(blobs, { type: "image/jpeg" });
+    if (out.size !== total) throw { code: "fetch", message: "tamaño inesperado" };
+    return out;
+  }
+
+  // PDF de una sola página que envuelve el JPEG tal cual (DCTDecode): sin recomprimir
+  function pdfFromJpeg(jpeg, f) {
+    const pw = (f.w / f.dpi * 72).toFixed(2), ph = (f.h / f.dpi * 72).toFixed(2);
+    const enc = new TextEncoder();
+    const parts = []; let off = 0; const xref = [];
+    const add = s => { const b = enc.encode(s); parts.push(b); off += b.length; };
+    add("%PDF-1.4\n%âãÏÓ\n");
+    xref[1] = off; add("1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n");
+    xref[2] = off; add("2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n");
+    xref[3] = off; add(`3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pw} ${ph}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>\nendobj\n`);
+    xref[4] = off; add(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${f.w} /Height ${f.h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.size} >>\nstream\n`);
+    parts.push(jpeg); off += jpeg.size;
+    add("\nendstream\nendobj\n");
+    const content = `q\n${pw} 0 0 ${ph} 0 0 cm\n/Im0 Do\nQ\n`;
+    xref[5] = off; add(`5 0 obj\n<< /Length ${enc.encode(content).length} >>\nstream\n${content}endstream\nendobj\n`);
+    xref[6] = off; add("6 0 obj\n<< /Title (Pirineos - del golfo de Bizkaia al cabo de Creus) /Subject (Lamina de 150 x 70 cm a 301 ppp) /Creator (github.com/navalpablo/misc_scripts) >>\nendobj\n");
+    const xrefAt = off;
+    let x = "xref\n0 7\n0000000000 65535 f \n";
+    for (let i = 1; i <= 6; i++) x += String(xref[i]).padStart(10, "0") + " 00000 n \n";
+    add(x + `trailer\n<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`);
+    return new Blob(parts, { type: "application/pdf" });
+  }
+
+  const buttons = ["d-jpg", "d-pdf", "d-scr"].map(id => document.getElementById(id));
+  let busy = false;
+  async function run(kind) {
+    if (busy) return;
+    busy = true; buttons.forEach(b => { b.disabled = true; });
+    const f = FILES[current];
+    const say = t => { statusEl.textContent = t; };
+    try {
+      let blob, filename;
+      if (kind === "scr") {
+        say("Preparando la descarga…");
+        blob = await fetchParts([f.screen], f.screenSize, p => say(`Preparando la descarga… ${Math.round(p * 100)} %`));
+        filename = f.screen;
+      } else {
+        say("Juntando la lámina… 0 %");
+        const jpeg = await fetchParts(f.parts, f.size, p => say(`Juntando la lámina… ${Math.round(p * 100)} %`));
+        if (kind === "pdf") { blob = pdfFromJpeg(jpeg, f); filename = f.name + "_150x70cm.pdf"; }
+        else { blob = jpeg; filename = f.name + "_150x70cm.jpg"; }
+      }
+      say("Confirma la descarga para guardar el archivo.");
+      await saveBlob(filename, blob);
+      say(`Listo: ${filename}`);
+    } catch (e) {
+      const code = e && e.code;
+      say(code === "declined" ? "Descarga cancelada."
+        : code === "too_large" ? "El archivo es demasiado grande para esta app. Prueba desde el navegador de un ordenador."
+        : code === "rate_limited" ? "Ya hay una descarga esperando confirmación."
+        : code === "fetch" ? "No se pudo leer el archivo. Revisa la conexión y vuelve a intentarlo."
+        : "Las descargas no están disponibles en esta vista.");
+    } finally {
+      busy = false; buttons.forEach(b => { b.disabled = false; });
+    }
+  }
+  document.getElementById("d-jpg").addEventListener("click", () => run("jpg"));
+  document.getElementById("d-pdf").addEventListener("click", () => run("pdf"));
+  document.getElementById("d-scr").addEventListener("click", () => run("scr"));
+  fillPanel();
 })();
 </script>
+
 </body>
 </html>
